@@ -1,5 +1,7 @@
 <?php
 
+namespace Server;
+
 class Server
 {
     private $config;
@@ -62,21 +64,19 @@ class Server
 
         $clients = [];
         do {
-            // Verifica se há alguma modificação no status de algum cliente
+            // Verifica se há alguma modificação de status em algum socket
             $read = array_merge([$this->socket], $clients);
-            $write = null;
-            $except = null;
-            $timeout = 5;
-            if (socket_select($read, $write, $except, $timeout) === 0) {
+            $write = $except = null;
+            if (socket_select($read, $write, $except, 5) === 0) {
                 continue;
             }
 
-            // Configura novas conexões
+            // Verifica se o servidor recebeu uma nova conexão
             if (in_array($this->socket, $read)) {
                 try {
                     if (($client_socket = socket_accept($this->socket)) === false) {
-                        $socket_error =  socket_strerror(socket_last_error($this->socket));
-                        $error_message =  sprintf("Falha ao estabelecer conexão com o cliente: \"%s\".\n", $error_message);
+                        $socket_error = socket_strerror(socket_last_error($this->socket));
+                        $error_message = sprintf("Falha ao estabelecer conexão com o cliente: \"%s\".\n", $error_message);
                         throw new Exception($error_message);
                     }
                 } catch(Exception $e) {
@@ -94,7 +94,7 @@ class Server
 
                 // Envia instruções ao cliente
                 $welcome_message = "\nBem-vindo ao WhatsLike!\n" .
-                "Você é o cliente #{$client_key}\n" .
+                "Você é o cliente #{$client_key}.\n" .
                 "Para sair, envie \"quit\". Para encerrar o servidor envie \"shutdown\".\n";
                 socket_write($client_socket, $welcome_message, strlen($welcome_message));
             }
