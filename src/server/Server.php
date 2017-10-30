@@ -6,6 +6,7 @@ class Server
 {
     private $config;
     private $socket;
+    private $clients;
 
     public function __construct()
     {
@@ -20,6 +21,8 @@ class Server
             printf("Erro ao ler arquivo de configurações: \"%s\".\n", $e->getMessage());
             exit(1);
         }
+
+        $this->clients = [];
 
         error_reporting(E_ALL);
         set_time_limit(0);
@@ -62,10 +65,9 @@ class Server
     {
         $this->openSocket();
 
-        $clients = [];
         do {
             // Verifica se há alguma modificação de status em algum socket
-            $read = array_merge([$this->socket], $clients);
+            $read = array_merge([$this->socket], $this->clients);
             $write = $except = null;
             if (socket_select($read, $write, $except, 5) === 0) {
                 continue;
@@ -84,13 +86,12 @@ class Server
                     break;
                 }
 
-                $client_ip = null;
-                $client_port = null;
+                $client_ip = $client_port = null;
                 socket_getpeername($client_socket, $client_ip, $client_port);
                 printf("%s:%s se conectou.\n", $client_ip, $client_port);
 
-                $clients[] = $client_socket;
-                $client_key = array_search($client_socket, $clients);
+                $this->clients[] = $client_socket;
+                $client_key = array_search($client_socket, $this->clients);
 
                 // Envia instruções ao cliente
                 $welcome_message = "\nBem-vindo ao WhatsLike!\n" .
@@ -100,7 +101,7 @@ class Server
             }
 
             // Gerencia entradas
-            foreach ($clients as $key => $client_socket) {
+            foreach ($this->clients as $key => $client_socket) {
                 if (in_array($client_socket, $read)) {
                     try {
                         if (($buffer = socket_read($client_socket, 2048, PHP_NORMAL_READ)) === false) {
@@ -120,7 +121,7 @@ class Server
                     }
 
                     if ($buffer == 'quit') {
-                        unset($clients[$key]);
+                        unset($this->clients[$key]);
                         socket_close($client_socket);
                         break;
                     }
