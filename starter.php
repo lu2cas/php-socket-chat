@@ -7,7 +7,7 @@ try {
     $server->run();
 
     exit(0);
-} catch(Exception $e) {
+} catch(\Exception $e) {
     printf("Erro ao executar aplicação: %s\n", $e->getMessage());
     exit(1);
 }
