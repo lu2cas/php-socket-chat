@@ -13,7 +13,8 @@ class Server
         $this->configure();
     }
 
-    private function configure() {
+    private function configure(): void
+    {
         try {
             $contents = file_get_contents(realpath(dirname(__FILE__)) . DIRECTORY_SEPARATOR . 'config.json');
             $this->config = json_decode($contents);
@@ -29,7 +30,7 @@ class Server
         ob_implicit_flush();
     }
 
-    private function openSocket()
+    private function openSocket(): void
     {
         try {
             if (($this->socket = @socket_create(AF_INET, SOCK_STREAM, SOL_TCP)) === false) {
@@ -56,25 +57,33 @@ class Server
         }
     }
 
-    private function closeSocket()
+    private function closeSocket(): void
     {
         socket_close($this->socket);
     }
 
-    public function run()
+    private function getWatingForReadingSockets(): array
+    {
+        $waiting_for_reading_sockets = [];
+
+        $read = array_merge([$this->socket], $this->clients);
+        $write = $except = null;
+        if (socket_select($read, $write, $except, 5) > 0) {
+            $waiting_for_reading_sockets = $read;
+        }
+
+        return $waiting_for_reading_sockets;
+    }
+
+    public function run(): void
     {
         $this->openSocket();
 
         do {
-            // Verifica se há alguma modificação de status em algum socket
-            $read = array_merge([$this->socket], $this->clients);
-            $write = $except = null;
-            if (socket_select($read, $write, $except, 5) === 0) {
-                continue;
-            }
+            $waiting_for_reading_sockets = $this->getWatingForReadingSockets();
 
             // Verifica se o servidor recebeu uma nova conexão
-            if (in_array($this->socket, $read)) {
+            if (in_array($this->socket, $waiting_for_reading_sockets)) {
                 try {
                     if (($client_socket = socket_accept($this->socket)) === false) {
                         $socket_error = socket_strerror(socket_last_error($this->socket));
@@ -100,41 +109,47 @@ class Server
                 socket_write($client_socket, $welcome_message, strlen($welcome_message));
             }
 
-            // Gerencia entradas
+            // Gerencia entradas de clientes
             foreach ($this->clients as $key => $client_socket) {
-                if (in_array($client_socket, $read)) {
+                if (in_array($client_socket, $waiting_for_reading_sockets)) {
                     try {
-                        if (($buffer = socket_read($client_socket, 2048, PHP_NORMAL_READ)) === false) {
-                            $socket_error = socket_strerror(socket_last_error($client_socket));
-                            $error_message = sprintf("Falha ao receber mensagem do cliente: \"%s\".\n", $socket_error);
-                            throw new Exception($error_message);
-                        }
-                        //@todo Formatar o $buffer com o charset correto
-                        $buffer = trim($buffer);
+                        $message = '';
+                        do {
+                            $buffer = @socket_read($client_socket, 5, PHP_NORMAL_READ);
+                            if ($buffer === false) {
+                                $socket_error = socket_strerror(socket_last_error($client_socket));
+                                $error_message = sprintf("Falha ao capturar mensagem do cliente: \"%s\".\n", $socket_error);
+                                throw new Exception($error_message);
+                            }
+                            $message .= $buffer;
+                        } while (!empty(trim($buffer)));
+
+                        //@todo Formatar a mensagem com o charset correto
+                        $message = trim($message);
                     } catch(Exception $e) {
                         print($e-getMessage());
                         break 2;
                     }
 
-                    if (empty($buffer)) {
+                    if (empty($message)) {
                         continue;
                     }
 
-                    if ($buffer == 'quit') {
+                    if ($message == 'quit') {
                         unset($this->clients[$key]);
                         socket_close($client_socket);
                         break;
                     }
 
-                    if ($buffer == 'shutdown') {
+                    if ($message == 'shutdown') {
                         socket_close($client_socket);
                         break 2;
                     }
 
-                    $echo_message = sprintf("Cliente #%s, você disse \"%s\".\n", $key, $buffer);
+                    $echo_message = sprintf("Cliente #%s, você disse \"%s\".\n", $key, $message);
                     socket_write($client_socket, $echo_message, strlen($echo_message));
 
-                    printf("Cliente #%s enviou: \"%s\".\n", $key, $buffer);
+                    printf("Cliente #%s enviou: \"%s\".\n", $key, $message);
                 }
             }
         } while (true);
