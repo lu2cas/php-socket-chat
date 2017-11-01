@@ -52,7 +52,7 @@ class Server
      *
      * @return void
      */
-    private function configure(): void
+    private function configure()
     {
         try {
             $contents = @file_get_contents(__DIR__ . DIRECTORY_SEPARATOR . 'config.json');
@@ -83,7 +83,7 @@ class Server
      *
      * @return void
      */
-    private function acceptClients(): void
+    private function acceptClients()
     {
         $waiting_for_reading_sockets = Socket::getSocketsWaitingForReading(array_merge([$this->serverSocket], $this->clients));
 
@@ -111,7 +111,7 @@ class Server
      *
      * @return void
      */
-    private function handleClientsRequests(): void
+    private function handleClientsRequests()
     {
         $waiting_for_reading_sockets = Socket::getSocketsWaitingForReading(array_merge([$this->serverSocket], $this->clients));
 
@@ -144,7 +144,7 @@ class Server
      *
      * @return void
      */
-    public function run(): void
+    public function run()
     {
         $this->serverSocket = Socket::getServerSocket(
             $this->config->address->ip,
@@ -168,7 +168,7 @@ class Server
      *
      * @return void
      */
-    public function stop(): void
+    public function stop()
     {
         $this->isRunning = false;
     }
