@@ -118,16 +118,12 @@ class Server
         foreach ($this->clients as $key => $client_socket) {
             if (in_array($client_socket, $waiting_for_reading_sockets)) {
                 try {
-                    $message = Socket::readFromSocket($client_socket);
+                    $request = Socket::readFromSocket($client_socket);
+                    $request = $this->parseRequest($request);
+                    $this->executeRequest($request, $client_socket);
                 } catch(\Exception $e) {
                     print($e->getMessage());
-                    continue;
-                }
-
-                //@todo Testar remoção de cliente
-                if ($message == 'quit') {
-                    unset($this->clients[$key]);
-                    Socket::closeSocket($client_socket);
+                    Socket::writeOnSocket($client_socket, $e->getMessage());
                     continue;
                 }
 
@@ -137,6 +133,34 @@ class Server
                 printf("Cliente #%s enviou: \"%s\".\n", $key, $message);
             }
         }
+    }
+
+    /**
+     * Interpreta e valida uma requisição
+     *
+     * @param string $request JSON de requisição
+     * @return array Requisição
+     */
+    private function parseRequest(string $request): array
+    {
+        return [];
+    }
+
+    /**
+     * Interpreta e valida uma requisição
+     *
+     * @param array $request Requisição bem formada
+     * @param resource|null $client_socket Socket do cliente que fez a requisição
+     * @return boolean true, quando requisição executada; false em caso de erro
+     */
+    private function executeRequest(array $request, resource $client_socket = null): boolean
+    {
+        if ($request['message'] == 'quit') {
+            unset($this->clients[$key]);
+            Socket::closeSocket($client_socket);
+        }
+
+        return true;
     }
 
     /**
