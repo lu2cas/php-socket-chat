@@ -3,6 +3,7 @@
 namespace Server;
 
 use Lib\Socket;
+use Server\Request;
 
 /**
  * Classe responsável por criar um servidor capaz de aceitar conexões de
@@ -57,15 +58,15 @@ class Server
         try {
             $contents = @file_get_contents(__DIR__ . DIRECTORY_SEPARATOR . 'config.json');
             if ($contents === false) {
-                throw new \Exception("Erro ao ler arquivo de configurações.\n");
+                throw new \Exception('Erro ao ler arquivo de configurações.');
             }
 
             $this->config = json_decode($contents);
             if (json_last_error() !== JSON_ERROR_NONE) {
-                throw new \Exception("Erro no formato do arquivo de configurações.\n");
+                throw new \Exception('Erro no formato do arquivo de configurações.');
             }
         } catch(\Exception $e) {
-            printf($e->getMessage());
+            printf("%s\n", $e->getMessage());
             exit(1);
         }
 
@@ -109,6 +110,7 @@ class Server
     /**
      * Manipula as requisições dos clientes conectados ao servidor
      *
+     * @throws Exception
      * @return void
      */
     private function handleClientsRequests()
@@ -118,19 +120,16 @@ class Server
         foreach ($this->clients as $key => $client_socket) {
             if (in_array($client_socket, $waiting_for_reading_sockets)) {
                 try {
-                    $request = Socket::readFromSocket($client_socket);
-                    $request = $this->parseRequest($request);
-                    $this->executeRequest($request, $client_socket);
+                    $json_request = Socket::readFromSocket($client_socket);
+                    $request = new Request($json_request);
+                    if ($request->isValid()) {
+                        $this->execute($request, $client_socket);
+                    }
                 } catch(\Exception $e) {
-                    print($e->getMessage());
-                    Socket::writeOnSocket($client_socket, $e->getMessage());
+                    printf("%s\n", $e->getMessage());
+                    Socket::writeOnSocket($client_socket, sprintf("%s\n", $e->getMessage()));
                     continue;
                 }
-
-                $echo_message = sprintf("Cliente #%s, você disse \"%s\".\n", $key, $message);
-                Socket::writeOnSocket($client_socket, $echo_message);
-
-                printf("Cliente #%s enviou: \"%s\".\n", $key, $message);
             }
         }
     }
@@ -138,29 +137,32 @@ class Server
     /**
      * Interpreta e valida uma requisição
      *
-     * @param string $request JSON de requisição
-     * @return array Requisição
+     * @param \Server\Request $request Objeto de requisição
+     * @param resource $client_socket Socket do cliente que fez a requisição
+     * @throws Exception
+     * @return void
      */
-    private function parseRequest(string $request): array
+    private function execute($request, $client_socket)
     {
-        return [];
+        $parameters = $request->getParameters();
+        $parameters['client_socket'] = $client_socket;
+        call_user_func_array(
+            [
+                $this,
+                $request->getMethod()
+            ],
+            $parameters
+        );
     }
 
-    /**
-     * Interpreta e valida uma requisição
-     *
-     * @param array $request Requisição bem formada
-     * @param resource|null $client_socket Socket do cliente que fez a requisição
-     * @return boolean true, quando requisição executada; false em caso de erro
-     */
-    private function executeRequest(array $request, resource $client_socket = null): boolean
+    public function echo($message, $client_socket)
     {
-        if ($request['message'] == 'quit') {
-            unset($this->clients[$key]);
-            Socket::closeSocket($client_socket);
-        }
+        $key = array_search($client_socket, $this->clients);
 
-        return true;
+        $echo_message = sprintf("Cliente #%s, você disse \"%s\".\n", $key, $message);
+        Socket::writeOnSocket($client_socket, $echo_message);
+
+        printf("Cliente #%s enviou: \"%s\".\n", $key, $message);
     }
 
     /**
@@ -190,10 +192,15 @@ class Server
     /**
      * Encerra as atividades do servidor
      *
+     * @throws Exception
      * @return void
      */
     public function stop()
     {
+        foreach ($this->clients as $client_socket) {
+            Socket::writeOnSocket($client_socket, "Servidor encerrado.\n");
+            Socket::closeSocket($client_socket);
+        }
         $this->isRunning = false;
     }
 }
