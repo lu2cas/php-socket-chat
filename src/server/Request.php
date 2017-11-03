@@ -2,8 +2,6 @@
 
 namespace Server;
 
-use Server\Server;
-
 /**
  * Classe responsável por servir como invólucro de requisições ao servidor
  *
@@ -62,7 +60,8 @@ class Request
         }
 
         $request['parameters']['requester_key'] = null;
-        $server_class = 'Server\Server';
+        $request['parameters']['clients'] = null;
+        $server_class = 'Server\Api';
         $method_reflection = new \ReflectionMethod($server_class, $request['method']);
 
         if (

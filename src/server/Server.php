@@ -4,7 +4,6 @@ namespace Server;
 
 use Lib\Socket;
 use Lib\Logger;
-use Server\Request;
 
 /**
  * Classe responsável por criar um servidor capaz de aceitar conexões de
@@ -40,6 +39,12 @@ class Server
     private $isRunning;
 
     /**
+     * Indicador de execução das atividades do servidor
+     * @var \Server\Api
+     */
+    private $api;
+
+    /**
      * Construtor da classe
      *
      * @return void
@@ -73,6 +78,7 @@ class Server
 
         $this->serverSocket = null;
         $this->clients = [];
+        $this->api = new Api();
 
         error_reporting(E_ALL);
         set_time_limit(0);
@@ -184,33 +190,23 @@ class Server
      */
     private function execute($request, $requester_key)
     {
+        $method = $request->getMethod();
+
         $parameters = $request->getParameters();
         $parameters['requester_key'] = $requester_key;
-        call_user_func_array(
+        $parameters['clients'] = $this->clients;
+
+        $return = call_user_func_array(
             [
-                $this,
-                $request->getMethod()
+                $this->api,
+                $method
             ],
             $parameters
         );
-    }
 
-    /**
-     * Ecoa a mensagem de um cliente
-     *
-     * @param string $message Mensagem enviada
-     * @param int $requester_key Chave do socket do cliente que fez a requisição
-     * @throws Exception
-     * @return void
-     */
-    public function echo($message, $requester_key)
-    {
-        $client_socket = $this->clients[$requester_key];
-
-        $echo_message = sprintf("Cliente #%s, você disse \"%s\".\n", $requester_key, $message);
-        Socket::writeOnSocket($client_socket, $echo_message);
-
-        Logger::log(sprintf("Cliente #%s enviou: \"%s\".", $requester_key, $message));
+        if ($method == 'quit') {
+            $this->clients = $return;
+        }
     }
 
 }

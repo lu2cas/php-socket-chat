@@ -51,7 +51,7 @@ class Socket {
      * @throws \Exception
      * @return void
      */
-    public static function closeSocket($socket): void
+    public static function closeSocket($socket)
     {
         $socket_closed = false;
 
@@ -70,7 +70,7 @@ class Socket {
      * @throws \Exception
      * @return int Número de bytes escritos com sucesso no socket
      */
-    public static function writeOnSocket($socket, $message): int
+    public static function writeOnSocket($socket, $message)
     {
         $written_bytes = false;
 
@@ -115,7 +115,7 @@ class Socket {
      * @param array $sockets Conjunto de sockets a serem inspecionados
      * @return array Conjunto de sockets que contém dados a serem consumidos
      */
-    public static function getSocketsWaitingForReading($sockets): array
+    public static function getSocketsWaitingForReading($sockets)
     {
         $sockets_waiting_for_reading = [];
 
