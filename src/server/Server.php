@@ -3,6 +3,7 @@
 namespace Server;
 
 use Lib\Socket;
+use Lib\Logger;
 use Server\Request;
 
 /**
@@ -78,93 +79,6 @@ class Server
         ob_implicit_flush();
     }
 
-
-    /**
-     * Registra os clientes que se conectam ao servidor
-     *
-     * @return void
-     */
-    private function acceptClients()
-    {
-        $waiting_for_reading_sockets = Socket::getSocketsWaitingForReading(array_merge([$this->serverSocket], $this->clients));
-
-        // Verifica se o servidor recebeu uma nova conexão
-        if (in_array($this->serverSocket, $waiting_for_reading_sockets)) {
-            $client_socket = Socket::acceptSocket($this->serverSocket);
-
-            list($client_ip, $client_port) = Socket::getSocketAddress($client_socket);
-            printf("%s:%s se conectou.\n", $client_ip, $client_port);
-
-            $this->clients[] = $client_socket;
-            $client_key = array_search($client_socket, $this->clients);
-
-            // Envia instruções ao cliente
-            $welcome_message = "\nBem-vindo ao WhatsLike!\n" .
-            "Você é o cliente #{$client_key}.\n" .
-            "Para sair, envie \"quit\".\n";
-
-            Socket::writeOnSocket($client_socket, $welcome_message);
-        }
-    }
-
-    /**
-     * Manipula as requisições dos clientes conectados ao servidor
-     *
-     * @throws Exception
-     * @return void
-     */
-    private function handleClientsRequests()
-    {
-        $waiting_for_reading_sockets = Socket::getSocketsWaitingForReading(array_merge([$this->serverSocket], $this->clients));
-
-        foreach ($this->clients as $key => $client_socket) {
-            if (in_array($client_socket, $waiting_for_reading_sockets)) {
-                try {
-                    $json_request = Socket::readFromSocket($client_socket);
-                    $request = new Request($json_request);
-                    if ($request->isValid()) {
-                        $this->execute($request, $client_socket);
-                    }
-                } catch(\Exception $e) {
-                    printf("%s\n", $e->getMessage());
-                    Socket::writeOnSocket($client_socket, sprintf("%s\n", $e->getMessage()));
-                    continue;
-                }
-            }
-        }
-    }
-
-    /**
-     * Interpreta e valida uma requisição
-     *
-     * @param \Server\Request $request Objeto de requisição
-     * @param resource $client_socket Socket do cliente que fez a requisição
-     * @throws Exception
-     * @return void
-     */
-    private function execute($request, $client_socket)
-    {
-        $parameters = $request->getParameters();
-        $parameters['client_socket'] = $client_socket;
-        call_user_func_array(
-            [
-                $this,
-                $request->getMethod()
-            ],
-            $parameters
-        );
-    }
-
-    public function echo($message, $client_socket)
-    {
-        $key = array_search($client_socket, $this->clients);
-
-        $echo_message = sprintf("Cliente #%s, você disse \"%s\".\n", $key, $message);
-        Socket::writeOnSocket($client_socket, $echo_message);
-
-        printf("Cliente #%s enviou: \"%s\".\n", $key, $message);
-    }
-
     /**
      * Inicia as atividades do servidor
      *
@@ -179,6 +93,8 @@ class Server
         if ($this->serverSocket === false) {
             throw new \Exception("Erro ao criar socket do servidor.\n");
         }
+
+        Logger::log("Servidor iniciado.");
 
         $this->isRunning = true;
         do {
@@ -195,7 +111,7 @@ class Server
      * @throws Exception
      * @return void
      */
-    public function stop()
+    public function halt()
     {
         foreach ($this->clients as $client_socket) {
             Socket::writeOnSocket($client_socket, "Servidor encerrado.\n");
@@ -203,4 +119,98 @@ class Server
         }
         $this->isRunning = false;
     }
+
+    /**
+     * Registra os clientes que se conectam ao servidor
+     *
+     * @return void
+     */
+    private function acceptClients()
+    {
+        $waiting_for_reading_sockets = Socket::getSocketsWaitingForReading(array_merge([$this->serverSocket], $this->clients));
+
+        // Verifica se o servidor recebeu uma nova conexão
+        if (in_array($this->serverSocket, $waiting_for_reading_sockets)) {
+            $client_socket = Socket::acceptSocket($this->serverSocket);
+
+            list($client_ip, $client_port) = Socket::getSocketAddress($client_socket);
+            Logger::log(sprintf("%s:%s se conectou.", $client_ip, $client_port));
+
+            $this->clients[] = $client_socket;
+            $client_key = array_search($client_socket, $this->clients);
+
+            // Envia instruções ao cliente
+            $welcome_message = "\nBem-vindo ao WhatsLike!\n" .
+            "Você é o cliente #{$client_key}.\n";
+
+            Socket::writeOnSocket($client_socket, $welcome_message);
+        }
+    }
+
+    /**
+     * Manipula as requisições dos clientes conectados ao servidor
+     *
+     * @throws Exception
+     * @return void
+     */
+    private function handleClientsRequests()
+    {
+        $waiting_for_reading_sockets = Socket::getSocketsWaitingForReading(array_merge([$this->serverSocket], $this->clients));
+
+        foreach ($this->clients as $client_key => $client_socket) {
+            if (in_array($client_socket, $waiting_for_reading_sockets)) {
+                try {
+                    $json_request = Socket::readFromSocket($client_socket);
+                    $request = new Request($json_request);
+                    if ($request->isValid()) {
+                        $this->execute($request, $client_key);
+                    }
+                } catch(\Exception $e) {
+                    Logger::log(sprintf("Falha na requisição do cliente #%s: %s", $client_key, $e->getMessage()));
+                    Socket::writeOnSocket($client_socket, sprintf("%s\n", $e->getMessage()));
+                    continue;
+                }
+            }
+        }
+    }
+
+    /**
+     * Interpreta e valida uma requisição
+     *
+     * @param \Server\Request $request Objeto de requisição
+     * @param int $requester_key Chave do socket do cliente que fez a requisição
+     * @throws Exception
+     * @return void
+     */
+    private function execute($request, $requester_key)
+    {
+        $parameters = $request->getParameters();
+        $parameters['requester_key'] = $requester_key;
+        call_user_func_array(
+            [
+                $this,
+                $request->getMethod()
+            ],
+            $parameters
+        );
+    }
+
+    /**
+     * Ecoa a mensagem de um cliente
+     *
+     * @param string $message Mensagem enviada
+     * @param int $requester_key Chave do socket do cliente que fez a requisição
+     * @throws Exception
+     * @return void
+     */
+    public function echo($message, $requester_key)
+    {
+        $client_socket = $this->clients[$requester_key];
+
+        $echo_message = sprintf("Cliente #%s, você disse \"%s\".\n", $requester_key, $message);
+        Socket::writeOnSocket($client_socket, $echo_message);
+
+        Logger::log(sprintf("Cliente #%s enviou: \"%s\".", $requester_key, $message));
+    }
+
 }

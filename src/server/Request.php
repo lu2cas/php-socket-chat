@@ -61,7 +61,7 @@ class Request
             throw new \Exception('Formato inválido de requisição.');
         }
 
-        $request['parameters']['client_socket'] = null;
+        $request['parameters']['requester_key'] = null;
         $server_class = 'Server\Server';
         $method_reflection = new \ReflectionMethod($server_class, $request['method']);
 
@@ -78,9 +78,6 @@ class Request
             }
         }
 
-//print_r($request); die;
-//print_r(count($request['parameters']));
-//print_r($method_reflection->getNumberOfRequiredParameters()); die;
         if (count($request['parameters']) != $method_reflection->getNumberOfRequiredParameters()) {
             throw new \Exception('Número de parâmetros inválido para o método requisitado.');
         }
