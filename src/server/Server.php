@@ -55,19 +55,14 @@ class Server
      */
     private function configure()
     {
-        try {
-            $contents = @file_get_contents(__DIR__ . DIRECTORY_SEPARATOR . 'config.json');
-            if ($contents === false) {
-                throw new \Exception('Erro ao ler arquivo de configurações.');
-            }
+        $contents = @file_get_contents(__DIR__ . DIRECTORY_SEPARATOR . 'config.json');
+        if ($contents === false) {
+            throw new \Exception('Arquivo de configurações inexistente.');
+        }
 
-            $this->config = json_decode($contents);
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                throw new \Exception('Erro no formato do arquivo de configurações.');
-            }
-        } catch(\Exception $e) {
-            printf("%s\n", $e->getMessage());
-            exit(1);
+        $this->config = json_decode($contents);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new \Exception('Formato inválido de arquivo de configurações do servidor.');
         }
 
         $this->serverSocket = null;
@@ -90,11 +85,8 @@ class Server
             $this->config->address->ip,
             $this->config->address->port
         );
-        if ($this->serverSocket === false) {
-            throw new \Exception("Erro ao criar socket do servidor.\n");
-        }
 
-        Logger::log("Servidor iniciado.");
+        Logger::log('Servidor iniciado.', Logger::INFO);
 
         $this->running = true;
         do {
@@ -134,7 +126,7 @@ class Server
             $client_socket = Socket::acceptSocket($this->serverSocket);
 
             list($client_ip, $client_port) = Socket::getSocketAddress($client_socket);
-            Logger::log(sprintf("%s:%s se conectou.", $client_ip, $client_port));
+            Logger::log(sprintf("%s:%s se conectou.", $client_ip, $client_port), Logger::INFO);
 
             $this->clients[] = $client_socket;
             $client_key = array_search($client_socket, $this->clients);
@@ -166,7 +158,7 @@ class Server
                         $this->execute($request, $client_key);
                     }
                 } catch(\Exception $e) {
-                    Logger::log(sprintf("Falha na requisição do cliente #%s: %s", $client_key, $e->getMessage()));
+                    Logger::log(sprintf("Falha ao executar requisição do cliente #%s: %s", $client_key, $e->getMessage()), Logger::WARNING);
                     Socket::writeOnSocket($client_socket, sprintf("%s\n", $e->getMessage()));
                     continue;
                 }

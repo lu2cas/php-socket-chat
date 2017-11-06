@@ -4,7 +4,8 @@
     "autoload": {
         "psr-4": {
             "Lib\\": "src/libs/",
-            "Server\\": "src/server/"
+            "Server\\": "src/server/",
+            "Client\\": "src/client/"
         }
     }
 }

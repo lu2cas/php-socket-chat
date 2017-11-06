@@ -25,24 +25,51 @@ class Socket {
 
         if (($server_socket = @socket_create(AF_INET, SOCK_STREAM, SOL_TCP)) === false) {
             $socket_error = socket_strerror(socket_last_error());
-            $error_message = sprintf("Erro ao criar socket do servidor: \"%s\".\n", $error_message);
+            $error_message = sprintf("Erro ao criar socket do servidor: \"%s\".", $error_message);
             throw new \Exception($error_message);
         }
 
         socket_set_option($server_socket, SOL_SOCKET, SO_REUSEADDR, 1);
         if (@socket_bind($server_socket, $ip, $port) === false) {
             $socket_error = socket_strerror(socket_last_error($server_socket));
-            $error_message = sprintf("Erro ao endereçar socket do servidor: \"%s\".\n", $socket_error);
+            $error_message = sprintf("Erro ao endereçar socket do servidor: \"%s\".", $socket_error);
             throw new \Exception($error_message);
         }
 
         if (@socket_listen($server_socket, 5) === false) {
             $socket_error = socket_strerror(socket_last_error($server_socket));
-            $error_message = sprintf("Erro ao abrir conexões com o socket do servidor: \"%s\".\n", $socket_error);
+            $error_message = sprintf("Erro ao abrir conexões com o socket do servidor: \"%s\".", $socket_error);
             throw new \Exception($error_message);
         }
 
         return $server_socket;
+    }
+
+    /**
+     * Cria o socket do servidor e o abre para conexões com clientes
+     *
+     * @param string $ip Endereço IP do servidor
+     * @param string $port Porta do servidor
+     * @throws \Exception
+     * @return resource Socket do servidor
+     */
+    public static function getClientSocket($ip, $port)
+    {
+        $client_socket = false;
+
+        if (($client_socket = @socket_create(AF_INET, SOCK_STREAM, SOL_TCP)) === false) {
+            $socket_error = socket_strerror(socket_last_error());
+            $error_message = sprintf("Erro ao criar socket do cliente: \"%s\".", $error_message);
+            throw new \Exception($error_message);
+        }
+
+        if (@socket_connect($client_socket, $ip, $port) === false) {
+            $socket_error = socket_strerror(socket_last_error($client_socket));
+            $error_message = sprintf("Erro ao conectar socket do cliente com o servidor: \"%s\".", $socket_error);
+            throw new \Exception($error_message);
+        }
+
+        return $client_socket;
     }
 
     /**
@@ -57,7 +84,7 @@ class Socket {
 
         if (($socket_closed = @socket_close($socket)) === false) {
             $socket_error = socket_strerror(socket_last_error($socket));
-            $error_message = sprintf("Erro ao fechar conexão com socket: \"%s\".\n", $socket_error);
+            $error_message = sprintf("Erro ao fechar conexão com socket: \"%s\".", $socket_error);
             throw new \Exception($error_message);
         }
     }
@@ -76,7 +103,7 @@ class Socket {
 
         if (($written_bytes = @socket_write($socket, $message, strlen($message))) === false) {
             $socket_error = socket_strerror(socket_last_error($socket));
-            $error_message = sprintf("Erro ao escrever mensagem em socket: \"%s\".\n", $socket_error);
+            $error_message = sprintf("Erro ao escrever mensagem em socket: \"%s\".", $socket_error);
             throw new \Exception($error_message);
         }
 
@@ -98,7 +125,7 @@ class Socket {
             $buffer = @socket_read($socket, 1024, PHP_NORMAL_READ);
             if ($buffer === false) {
                 $socket_error = socket_strerror(socket_last_error($socket));
-                $error_message = sprintf("Falha ao ler buffer do socket: \"%s\".\n", $socket_error);
+                $error_message = sprintf("Falha ao ler buffer do socket: \"%s\".", $socket_error);
                 throw new \Exception($error_message);
             }
             $message .= $buffer;
@@ -123,7 +150,7 @@ class Socket {
         $selected_sockets = @socket_select($sockets, $null, $null, 5);
 
         if ($selected_sockets === false) {
-            throw new \Exception("Erro ao inspecionar sockets para leitura.\n");
+            throw new \Exception("Erro ao inspecionar sockets para leitura.");
         }
 
         if ($selected_sockets > 0) {
@@ -145,7 +172,7 @@ class Socket {
 
         if (($socket = @socket_accept($listener_socket)) === false) {
             $socket_error = socket_strerror(socket_last_error($listener_socket));
-            $error_message = sprintf("Falha ao estabelecer conexão com o cliente: \"%s\".\n", $error_message);
+            $error_message = sprintf("Falha ao estabelecer conexão com o cliente: \"%s\".", $error_message);
             throw new \Exception($error_message);
         }
 
@@ -165,7 +192,7 @@ class Socket {
         $ip = $port = null;
         if (@socket_getpeername($socket, $ip, $port) === false) {
             $socket_error = socket_strerror(socket_last_error($socket));
-            $error_message = sprintf("Falha ao obter endereço do socket: \"%s\".\n", $error_message);
+            $error_message = sprintf("Falha ao obter endereço do socket: \"%s\".", $error_message);
             throw new \Exception($error_message);
         }
 

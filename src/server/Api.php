@@ -15,21 +15,23 @@ class Api
 {
     /**
     * Chave do cliente que realiza a requisição
+    *
     * @var string
     */
     private $clientKey;
 
     /**
      * Conjunto de clientes conectados ao servidor
+     *
      * @var array
      */
     private $clients;
 
     /**
      * Construtor da classe
+     *
      * @param int $client_key Chave do cliente que realiza a requisição
      * @param array $clients Conjunto de clientes conectados ao servidor
-     *
      * @return void
      */
     public function __construct($client_key, $clients)
@@ -57,7 +59,7 @@ class Api
         $echo_message = sprintf("Cliente #%s, você disse \"%s\".\n", $this->clientKey, $message);
         Socket::writeOnSocket($client_socket, $echo_message);
 
-        Logger::log(sprintf("Cliente #%s enviou: \"%s\".", $this->clientKey, $message));
+        Logger::log(sprintf("Cliente #%s enviou: \"%s\".", $this->clientKey, $message), Logger::INFO);
     }
 
     /**
@@ -74,6 +76,6 @@ class Api
         Socket::closeSocket($client_socket);
         unset($this->clients[$this->clientKey]);
 
-        Logger::log(sprintf("%s:%s se desconectou.", $client_ip, $client_port));
+        Logger::log(sprintf("%s:%s se desconectou.", $client_ip, $client_port), Logger::INFO);
     }
 }

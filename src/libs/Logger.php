@@ -10,7 +10,11 @@ namespace Lib;
   */
 class Logger
 {
-    public static function log($message) {
-        printf("[%s] %s\n", date('d/m/Y H:i:s'), $message);
+    const INFO = 'informe';
+    const WARNING = 'aviso';
+    const ERROR = 'erro';
+
+    public static function log($message, $type) {
+        printf("[%s][%s] %s\n", date('d/m/Y H:i:s'), $type, $message);
     }
 }
