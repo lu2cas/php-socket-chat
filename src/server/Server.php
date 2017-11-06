@@ -106,7 +106,7 @@ class Server
     public function halt()
     {
         foreach ($this->clients as $client_socket) {
-            Socket::writeOnSocket($client_socket, "Servidor encerrado.\n");
+            Socket::writeOnSocket($client_socket, "Servidor encerrado.");
             Socket::closeSocket($client_socket);
         }
         $this->running = false;
@@ -132,10 +132,14 @@ class Server
             $client_key = array_search($client_socket, $this->clients);
 
             // Envia instruções ao cliente
-            $welcome_message = "\nBem-vindo ao WhatsLike!\n" .
-            "Você é o cliente #{$client_key}.\n";
+            $welcome_message = "Bem-vindo ao WhatsLike!\n" .
+            "Você é o cliente #{$client_key}.";
 
-            Socket::writeOnSocket($client_socket, $welcome_message);
+            try {
+                Socket::writeOnSocket($client_socket, $welcome_message);
+            } catch(\Exception $e) {
+                Logger::log(sprintf("Falha ao enviar mensagem para o cliente #%s: %s", $client_key, $e->getMessage()), Logger::WARNING);
+            }
         }
     }
 
@@ -159,7 +163,6 @@ class Server
                     }
                 } catch(\Exception $e) {
                     Logger::log(sprintf("Falha ao executar requisição do cliente #%s: %s", $client_key, $e->getMessage()), Logger::WARNING);
-                    Socket::writeOnSocket($client_socket, sprintf("%s\n", $e->getMessage()));
                     continue;
                 }
             }

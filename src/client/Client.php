@@ -76,11 +76,14 @@ class Client
             $this->config->server->address->port
         );
 
-        Logger::log('Cliente conectado.', Logger::INFO);
-
         $this->running = true;
         do {
-            // Ler comandos do usuário
+            Socket::writeOnSocket($this->clientSocket, '{"method":"echo","parameters":{"message":"hello"}}');
+
+            $message = Socket::readFromSocket($this->clientSocket);
+            if (!empty($message)) {
+                print($message);
+            }
         } while ($this->running);
 
         Socket::closeSocket($this->clientSocket);
@@ -94,9 +97,6 @@ class Client
      */
     public function halt()
     {
-        Socket::writeOnSocket($this->clientSocket, "Cliente desconetado.\n");
-        Socket::closeSocket($client_socket);
-
         $this->running = false;
     }
 }

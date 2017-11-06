@@ -56,7 +56,7 @@ class Api
     {
         $client_socket = $this->clients[$this->clientKey];
 
-        $echo_message = sprintf("Cliente #%s, você disse \"%s\".\n", $this->clientKey, $message);
+        $echo_message = sprintf("Cliente #%s, você disse \"%s\".", $this->clientKey, $message);
         Socket::writeOnSocket($client_socket, $echo_message);
 
         Logger::log(sprintf("Cliente #%s enviou: \"%s\".", $this->clientKey, $message), Logger::INFO);

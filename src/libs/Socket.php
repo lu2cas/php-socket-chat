@@ -101,6 +101,7 @@ class Socket {
     {
         $written_bytes = false;
 
+        $message = $message . "\n\r"; // "\n\r" indica o fim da mensagem
         if (($written_bytes = @socket_write($socket, $message, strlen($message))) === false) {
             $socket_error = socket_strerror(socket_last_error($socket));
             $error_message = sprintf("Erro ao escrever mensagem em socket: \"%s\".", $socket_error);
@@ -128,10 +129,9 @@ class Socket {
                 $error_message = sprintf("Falha ao ler buffer do socket: \"%s\".", $socket_error);
                 throw new \Exception($error_message);
             }
+
             $message .= $buffer;
         } while (!empty(trim($buffer)));
-
-        $message = trim($message);
 
         return $message;
     }
@@ -172,7 +172,7 @@ class Socket {
 
         if (($socket = @socket_accept($listener_socket)) === false) {
             $socket_error = socket_strerror(socket_last_error($listener_socket));
-            $error_message = sprintf("Falha ao estabelecer conexão com o cliente: \"%s\".", $error_message);
+            $error_message = sprintf("Falha ao estabelecer conexão com o cliente: \"%s\".", $socket_error);
             throw new \Exception($error_message);
         }
 
