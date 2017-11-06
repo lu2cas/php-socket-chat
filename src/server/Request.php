@@ -56,24 +56,23 @@ class Request
             !array_key_exists('parameters', $request) ||
             !is_array($request['parameters'])
         ) {
-            throw new \Exception('Formato inválido de requisição.');
+            throw new \Exception('Formato de requisição inválido.');
         }
 
-        $request['parameters']['requester_key'] = null;
-        $request['parameters']['clients'] = null;
-        $server_class = 'Server\Api';
-        $method_reflection = new \ReflectionMethod($server_class, $request['method']);
+        $api_class = 'Server\Api';
+        $method_reflection = new \ReflectionMethod($api_class, $request['method']);
 
         if (
-            !method_exists($server_class, $request['method']) ||
-            !is_callable($server_class, $request['method']) ||
+            !method_exists($api_class, $request['method']) ||
+            !is_callable($api_class, $request['method']) ||
             !$method_reflection->isPublic()
         ) {
             throw new \Exception('Método requisitado indisponível.');
         }
+
         foreach (array_keys($request['parameters']) as $key) {
             if (!is_string($key)) {
-                throw new \Exception('Formato inválido de parâmetros do método requisitado.');
+                throw new \Exception('Formato de parâmetros inválido para o método requisitado.');
             }
         }
 
@@ -82,7 +81,7 @@ class Request
         }
 
         $request['parameters'] = $this->sortParameters($request['parameters'], $method_reflection->getParameters());
-        if ($request['parameters'] === null) {
+        if ($request['parameters'] === false) {
             throw new \Exception('Nomes de parâmetros inválidos para o método requisitado.');
         }
 
@@ -98,8 +97,8 @@ class Request
      *
      * @param array $sent_parameters Parâmetros enviados
      * @param array $reflected_parameters Parâmetros necessários ao método requisitado
-     * @return array Parâmetros ordenados de acordo com a assinatura do método requisitado;
-     * null caso algum parâmetro esteja com o nome incorreto
+     * @return array|boolean Parâmetros ordenados de acordo com a assinatura do método requisitado;
+     * false caso algum parâmetro esteja com o nome incorreto
      */
     private function sortParameters($sent_parameters, $reflected_parameters)
     {
@@ -114,7 +113,7 @@ class Request
             }
         }
 
-        return array_keys($parameters) == $valid_parameters ? $parameters : null;
+        return array_keys($parameters) == $valid_parameters ? $parameters : false;
     }
 
     /**

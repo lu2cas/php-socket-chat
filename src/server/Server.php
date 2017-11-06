@@ -36,13 +36,7 @@ class Server
      * Indicador de execução das atividades do servidor
      * @var boolean
      */
-    private $isRunning;
-
-    /**
-     * Indicador de execução das atividades do servidor
-     * @var \Server\Api
-     */
-    private $api;
+    private $running;
 
     /**
      * Construtor da classe
@@ -78,7 +72,7 @@ class Server
 
         $this->serverSocket = null;
         $this->clients = [];
-        $this->api = new Api();
+        $this->running = false;
 
         error_reporting(E_ALL);
         set_time_limit(0);
@@ -102,11 +96,11 @@ class Server
 
         Logger::log("Servidor iniciado.");
 
-        $this->isRunning = true;
+        $this->running = true;
         do {
             $this->acceptClients();
             $this->handleClientsRequests();
-        } while ($this->isRunning);
+        } while ($this->running);
 
         Socket::closeSocket($this->serverSocket);
     }
@@ -123,7 +117,7 @@ class Server
             Socket::writeOnSocket($client_socket, "Servidor encerrado.\n");
             Socket::closeSocket($client_socket);
         }
-        $this->isRunning = false;
+        $this->running = false;
     }
 
     /**
@@ -184,29 +178,23 @@ class Server
      * Interpreta e valida uma requisição
      *
      * @param \Server\Request $request Objeto de requisição
-     * @param int $requester_key Chave do socket do cliente que fez a requisição
+     * @param int $client_key Chave do cliente que realiza a requisição
      * @throws Exception
      * @return void
      */
-    private function execute($request, $requester_key)
+    private function execute($request, $client_key)
     {
-        $method = $request->getMethod();
+        $api = new Api($client_key, $this->clients);
 
-        $parameters = $request->getParameters();
-        $parameters['requester_key'] = $requester_key;
-        $parameters['clients'] = $this->clients;
-
-        $return = call_user_func_array(
+        call_user_func_array(
             [
-                $this->api,
-                $method
+                $api,
+                $request->getMethod()
             ],
-            $parameters
+            $request->getParameters()
         );
 
-        if ($method == 'quit') {
-            $this->clients = $return;
-        }
+        $this->clients = $api->getClients();
     }
 
 }

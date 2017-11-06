@@ -13,38 +13,67 @@ use Lib\Logger;
   */
 class Api
 {
-    public function __construct()
+    /**
+    * Chave do cliente que realiza a requisição
+    * @var string
+    */
+    private $clientKey;
+
+    /**
+     * Conjunto de clientes conectados ao servidor
+     * @var array
+     */
+    private $clients;
+
+    /**
+     * Construtor da classe
+     * @param int $client_key Chave do cliente que realiza a requisição
+     * @param array $clients Conjunto de clientes conectados ao servidor
+     *
+     * @return void
+     */
+    public function __construct($client_key, $clients)
     {
-        // Construtor
+        $this->clientKey = $client_key;
+        $this->clients = $clients;
+    }
+
+    public function getClients()
+    {
+        return $this->clients;
     }
 
     /**
      * Ecoa a mensagem de um cliente
      *
      * @param string $message Mensagem enviada
-     * @param int $requester_key Chave do socket do cliente que fez a requisição
-     * @param array $clients Sockets de clientes conectados ao servidor
      * @throws Exception
      * @return void
      */
-    public function echo($message, $requester_key, $clients)
+    public function echo($message)
     {
-        $client_socket = $clients[$requester_key];
+        $client_socket = $this->clients[$this->clientKey];
 
-        $echo_message = sprintf("Cliente #%s, você disse \"%s\".\n", $requester_key, $message);
+        $echo_message = sprintf("Cliente #%s, você disse \"%s\".\n", $this->clientKey, $message);
         Socket::writeOnSocket($client_socket, $echo_message);
 
-        Logger::log(sprintf("Cliente #%s enviou: \"%s\".", $requester_key, $message));
+        Logger::log(sprintf("Cliente #%s enviou: \"%s\".", $this->clientKey, $message));
     }
 
-    public function quit($requester_key, $clients)
+    /**
+     * Desconecta um cliente do servidor
+     *
+     * @throws Exception
+     * @return void
+     */
+    public function quit()
     {
-        $client_socket = $clients[$requester_key];
+        $client_socket = $this->clients[$this->clientKey];
+
         list($client_ip, $client_port) = Socket::getSocketAddress($client_socket);
         Socket::closeSocket($client_socket);
-        Logger::log(sprintf("%s:%s se desconectou.", $client_ip, $client_port));
-        unset($clients[$requester_key]);
+        unset($this->clients[$this->clientKey]);
 
-        return $clients;
+        Logger::log(sprintf("%s:%s se desconectou.", $client_ip, $client_port));
     }
 }
