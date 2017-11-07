@@ -32,6 +32,12 @@ class Client
     private $running;
 
     /**
+     * Stream da entrada de dados padrão
+     * @var resource
+     */
+    private $stdin;
+
+    /**
      * Construtor da classe
      *
      * @return void
@@ -58,6 +64,7 @@ class Client
         }
         $this->clientSocket = null;
         $this->running = false;
+        $this->stdin = fopen('php://stdin','r');
 
         error_reporting(E_ALL);
         set_time_limit(0);
@@ -77,13 +84,12 @@ class Client
         );
 
         $this->running = true;
-        do {
-            Socket::writeOnSocket($this->clientSocket, '{"method":"echo","parameters":{"message":"hello"}}');
 
-            $message = Socket::readFromSocket($this->clientSocket);
-            if (!empty($message)) {
-                print($message);
-            }
+        $this->joinServer();
+
+        do {
+            $this->handleServerResponse();
+            $this->handleUserInput();
         } while ($this->running);
 
         Socket::closeSocket($this->clientSocket);
@@ -92,11 +98,84 @@ class Client
     /**
      * Encerra o cliente
      *
-     * @throws Exception
      * @return void
      */
     public function halt()
     {
         $this->running = false;
+    }
+
+    private function handleServerResponse()
+    {
+        $waiting_for_reading_sockets = Socket::getSocketsWaitingForReading([$this->clientSocket]);
+
+        if (!empty($waiting_for_reading_sockets)) {
+            $message = Socket::readFromSocket($this->clientSocket);
+            if (!empty(trim($message))) {
+                printf("%s\n", $message);
+            }
+        }
+    }
+
+    public function nonBlockRead() {
+        $read = [$this->stdin];
+        $null = null;
+        $result = stream_select($read, $null, $null, 0);
+
+        if ($result === 0) {
+            return false;
+        }
+
+        $input = fgets($this->stdin);
+
+        return trim($input);
+    }
+
+    private function handleUserInput()
+    {
+        $input = $this->nonBlockRead();
+
+        if (!empty($input)) {
+            $input = trim($input);
+            $input = explode(' ', $input);
+
+            $method = array_shift($input);
+            $parameters = $input;
+
+            switch ($method) {
+                case '/m':
+                    $request = $this->makeRequest('sendMessage', $parameters);
+                    Socket::writeOnSocket($this->clientSocket, $request);
+                    break;
+
+                default:
+                    print("Comando inválido.\n");
+                    break;
+            }
+        }
+    }
+
+    private function makeRequest($method, $parameters = [])
+    {
+        $request = [
+            'method' => $method,
+            'parameters' => $parameters
+        ];
+
+        $request = json_encode($request);
+
+        return $request;
+    }
+
+    private function joinServer()
+    {
+        print('Por favor, digite o seu nome de usuário: ');
+        $username = fgets($this->stdin);
+
+        //@todo Validar nome de usuário
+        if (!empty($username)) {
+            $request = $this->makeRequest('join', ['usename' => $username]);
+            Socket::writeOnSocket($this->clientSocket, $request);
+        }
     }
 }

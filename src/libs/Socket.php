@@ -147,7 +147,7 @@ class Socket {
         $sockets_waiting_for_reading = [];
 
         $null = null;
-        $selected_sockets = @socket_select($sockets, $null, $null, 5);
+        $selected_sockets = @socket_select($sockets, $null, $null, 0);
 
         if ($selected_sockets === false) {
             throw new \Exception("Erro ao inspecionar sockets para leitura.");
