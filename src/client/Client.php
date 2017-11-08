@@ -26,12 +26,6 @@ class Client
     private $clientSocket;
 
     /**
-     * Indicador de execução das atividades do client
-     * @var boolean
-     */
-    private $running;
-
-    /**
      * Stream da entrada de dados padrão
      * @var resource
      */
@@ -78,6 +72,8 @@ class Client
      */
     public function run()
     {
+        print("Iniciando cliente do php-socket-chat...\n\n");
+
         $this->clientSocket = Socket::getClientSocket(
             $this->config->server->address->ip,
             $this->config->server->address->port
@@ -87,22 +83,12 @@ class Client
 
         $this->bindUsername();
 
-        do {
+        $this->sendRequest('printWelcomeMessage');
+
+        while (true) {
             $this->handleServerResponse();
             $this->handleUserInput();
-        } while ($this->running);
-
-        Socket::closeSocket($this->clientSocket);
-    }
-
-    /**
-     * Encerra o cliente
-     *
-     * @return void
-     */
-    public function halt()
-    {
-        $this->running = false;
+        }
     }
 
     /**
@@ -115,9 +101,29 @@ class Client
         $waiting_for_reading_sockets = Socket::getSocketsWaitingForReading([$this->clientSocket]);
 
         if (!empty($waiting_for_reading_sockets)) {
-            $message = Socket::readFromSocket($this->clientSocket);
-            if (!empty(trim($message))) {
-                printf("%s\n", $message);
+            $response = Socket::readFromSocket($this->clientSocket);
+            $response = json_decode($response, true);
+
+            $output = '';
+            if (array_key_exists('datetime', $response) && !empty($response['datetime'])) {
+                $output .= sprintf("[%s]", $response['datetime']);
+            }
+
+            if (array_key_exists('sender', $response) && !empty($response['sender'])) {
+                $output .= sprintf("[%s]: ", $response['sender']);
+            }
+
+            if (array_key_exists('message', $response) && !empty($response['message'])) {
+                $output .= sprintf("%s", $response['message']);
+            }
+
+            if (!empty($output)) {
+                printf("%s\n", $output);
+            }
+
+            if (array_key_exists('exit', $response) && $response['exit'] == 1) {
+                Socket::closeSocket($this->clientSocket);
+                exit(0);
             }
         }
     }
@@ -158,11 +164,12 @@ class Client
             $parameters = $input;
 
             switch ($method) {
-                case '/m':
-                    $request = $this->makeRequest('sendMessage', $parameters);
-                    Socket::writeOnSocket($this->clientSocket, $request);
+                case '/e':
+                    $this->sendRequest('echo', ['message' => $parameters[0]]);
                     break;
-
+                case '/q':
+                    $this->sendRequest('quit');
+                    break;
                 default:
                     print("Comando inválido.\n");
                     break;
@@ -175,9 +182,9 @@ class Client
      *
      * @param string $method Método a ser executado no servidor
      * @param array $parameters Parâmetros do método a ser executado
-     * @return string JSON de requisição
+     * @return void
      */
-    private function makeRequest($method, $parameters = [])
+    private function sendRequest($method, $parameters = [])
     {
         $request = [
             'method' => $method,
@@ -186,7 +193,7 @@ class Client
 
         $request = json_encode($request);
 
-        return $request;
+        Socket::writeOnSocket($this->clientSocket, $request);
     }
 
     /**
@@ -200,9 +207,12 @@ class Client
         $username = fgets($this->stdin);
 
         //@todo Validar nome de usuário
+        $username = trim($username);
+
         if (!empty($username)) {
-            $request = $this->makeRequest('bindUsername', ['usename' => $username]);
-            Socket::writeOnSocket($this->clientSocket, $request);
+            $this->sendRequest('bindUsername', ['username' => $username]);
         }
+
+        print("\n");
     }
 }

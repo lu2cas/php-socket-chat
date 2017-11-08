@@ -33,12 +33,6 @@ class Server
     private $clients;
 
     /**
-     * Indicador de execução das atividades do servidor
-     * @var boolean
-     */
-    private $running;
-
-    /**
      * Construtor da classe
      *
      * @return void
@@ -67,7 +61,6 @@ class Server
 
         $this->serverSocket = null;
         $this->clients = [];
-        $this->running = false;
 
         error_reporting(E_ALL);
         set_time_limit(0);
@@ -88,13 +81,10 @@ class Server
 
         Logger::log('Servidor iniciado.', Logger::INFO);
 
-        $this->running = true;
-        do {
+        while (true) {
             $this->acceptClients();
             $this->handleClientsRequests();
-        } while ($this->running);
-
-        Socket::closeSocket($this->serverSocket);
+        };
     }
 
     /**
@@ -105,11 +95,20 @@ class Server
      */
     public function halt()
     {
-        foreach ($this->clients as $client_socket) {
-            Socket::writeOnSocket($client_socket, "Servidor encerrado.");
-            Socket::closeSocket($client_socket);
+        $json_request = json_encode(['method' => 'quit', 'parameters' => []]);
+        $request = new Request($json_request);
+
+        if ($request->isValid()) {
+            foreach ($this->clients as $client) {
+                $this->execute($request, $client['address']);
+            }
         }
-        $this->running = false;
+
+        Socket::closeSocket($this->serverSocket);
+
+        Logger::log('Servidor encerrado.', Logger::INFO);
+
+        exit(0);
     }
 
     /**
@@ -131,23 +130,14 @@ class Server
 
             list($client_ip, $client_port) = Socket::getSocketAddress($client_socket);
             $client_address = sprintf('%s:%s', $client_ip, $client_port);
-            Logger::log(sprintf("%s se conectou.", $client_address), Logger::INFO);
+
+            Logger::log(sprintf('%s se conectou.', $client_address), Logger::INFO);
 
             $this->clients[] = [
                 'socket' => $client_socket,
                 'address' => $client_address,
                 'username' => null
             ];
-
-            // Envia instruções ao cliente
-            $welcome_message = "Bem-vindo ao WhatsLike!\n" .
-            "O seu endereço é {$client_address}.";
-
-            try {
-                Socket::writeOnSocket($client_socket, $welcome_message);
-            } catch(\Exception $e) {
-                Logger::log(sprintf("Falha ao enviar mensagem para %s: %s", $client_address, $e->getMessage()), Logger::WARNING);
-            }
         }
     }
 
@@ -159,18 +149,25 @@ class Server
      */
     private function handleClientsRequests()
     {
-        $waiting_for_reading_sockets = Socket::getSocketsWaitingForReading(array_merge([$this->serverSocket], $this->clients));
+        $sockets = [$this->serverSocket];
+        foreach ($this->clients as $client) {
+            $sockets[] = $client['socket'];
+        }
+        $waiting_for_reading_sockets = Socket::getSocketsWaitingForReading($sockets);
 
         foreach ($this->clients as $client) {
             if (in_array($client['socket'], $waiting_for_reading_sockets)) {
                 try {
                     $json_request = Socket::readFromSocket($client['socket']);
+
+                    Logger::log(sprintf("Cliente %s enviou: %s", $client['address'], $json_request), Logger::INFO);
+
                     $request = new Request($json_request);
                     if ($request->isValid()) {
-                        $this->execute($request, $client['username']);
+                        $this->execute($request, $client['address']);
                     }
                 } catch(\Exception $e) {
-                    Logger::log(sprintf("Falha ao executar requisição do cliente #%s: %s", $client['username'], $e->getMessage()), Logger::WARNING);
+                    Logger::log(sprintf("Falha ao executar requisição de %s: %s", $client['address'], $e->getMessage()), Logger::WARNING);
                     continue;
                 }
             }
@@ -181,13 +178,13 @@ class Server
      * Interpreta e valida uma requisição
      *
      * @param \Server\Request $request Objeto de requisição
-     * @param int $client_key Chave do cliente que realiza a requisição
+     * @param string $client_address Endereço do cliente que realiza a requisição
      * @throws Exception
      * @return void
      */
-    private function execute($request, $username)
+    private function execute($request, $client_address)
     {
-        $api = new Api($client_key, $this->clients);
+        $api = new Api($client_address, $this->clients);
 
         call_user_func_array(
             [

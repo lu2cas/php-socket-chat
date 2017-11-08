@@ -121,7 +121,7 @@ class Request
      *
      * @return string
      */
-    public function getMethod(): string
+    public function getMethod()
     {
         return $this->method;
     }
@@ -131,7 +131,7 @@ class Request
      *
      * @return array
      */
-    public function getParameters(): array
+    public function getParameters()
     {
         return $this->parameters;
     }

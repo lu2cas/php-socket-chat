@@ -1,7 +1,5 @@
 <?php
 
-use Lib\Logger;
-
 try {
     $loader = require __DIR__ . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php';
 
@@ -21,6 +19,6 @@ try {
 
     exit(0);
 } catch(\Exception $e) {
-    Lib\Logger::log(sprintf("Erro ao executar aplicação: %s", $e->getMessage()), Logger::ERROR);
+    printf("Aplicação encerrada: %s\n", $e->getMessage());
     exit(1);
 }

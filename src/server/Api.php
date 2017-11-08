@@ -14,11 +14,11 @@ use Lib\Logger;
 class Api
 {
     /**
-    * Chave do cliente que realiza a requisição
+    * Cliente que realiza a requisição
     *
-    * @var string
+    * @var array
     */
-    private $clientKey;
+    private $client;
 
     /**
      * Conjunto de clientes conectados ao servidor
@@ -30,19 +30,118 @@ class Api
     /**
      * Construtor da classe
      *
-     * @param int $client_key Chave do cliente que realiza a requisição
+     * @param string $client_address Endereço do cliente que realiza a requisição
      * @param array $clients Conjunto de clientes conectados ao servidor
      * @return void
      */
-    public function __construct($client_key, $clients)
+    public function __construct($client_address, $clients)
     {
-        $this->clientKey = $client_key;
+        $this->clientAddress = $client_address;
         $this->clients = $clients;
+
+        $client_key = $this->getClientKey($client_address);
     }
 
+    /**
+     * Retorna o conjunto atualizado de clientes conectados ao servidor
+     *
+     * @return array
+     */
     public function getClients()
     {
         return $this->clients;
+    }
+
+    /**
+     * Retorna a chave de um cliente no conjunto de clientes conectados
+     *
+     * @param string $address Endereço do cliente
+     * @return int
+     */
+    private function getClientKey($address)
+    {
+        $found_key = null;
+
+        foreach ($this->clients as $key => $client) {
+            if ($client['address'] == $address) {
+                $found_key = $key;
+                break;
+            }
+        }
+
+        return $found_key;
+    }
+
+    /**
+     * Retorna o registro de um cliente
+     *
+     * @param string $address Endereço do cliente
+     * @return array
+     */
+    private function getClient($address)
+    {
+        $found_client = null;
+
+        foreach ($this->clients as $client) {
+            if ($client['address'] == $address) {
+                $found_client = $client;
+                break;
+            }
+        }
+
+        return $found_client;
+    }
+
+    /**
+     * Formata e envia dados para um cliente
+     *
+     * @param array $client Registro do cliente de destino
+     * @param array $message Dados a serem enviados
+     * @throws Exception
+     * @return void
+     */
+    private function sendData($client, $data)
+    {
+        $data = json_encode($data);
+
+        try {
+            Socket::writeOnSocket($client['socket'], $data);
+        } catch(\Exception $e) {
+            Logger::log(sprintf("Falha ao enviar dados para %s: %s", $client['address'], $e->getMessage()), Logger::WARNING);
+        }
+    }
+
+    /**
+     * Associa um nome de usuário ao cliente
+     *
+     * @return void
+     */
+    public function bindUsername($username)
+    {
+        $client_key = $this->getClientKey($this->clientAddress);
+        $this->clients[$client_key]['username'] = $username;
+    }
+
+    /**
+     * Envia uma mensagem de boas-vindas ao cliente
+     *
+     * @return void
+     */
+    public function printWelcomeMessage()
+    {
+        $client = $this->getClient($this->clientAddress);
+
+        $welcome_message = sprintf(
+            "Bem-vindo, %s!\nVocê está conectado ao servidor com o endereço %s.\n",
+            $client['username'],
+            $client['address']
+        );
+
+        $data = [
+            'message' => $welcome_message
+        ];
+
+        $this->sendData($client, $data);
     }
 
     /**
@@ -54,12 +153,14 @@ class Api
      */
     public function echo($message)
     {
-        $client_socket = $this->clients[$this->clientKey];
+        $client = $this->getClient($this->clientAddress);
 
-        $echo_message = sprintf("Cliente #%s, você disse \"%s\".", $this->clientKey, $message);
-        Socket::writeOnSocket($client_socket, $echo_message);
+        $data = [
+            'message' => sprintf("%s, você disse \"%s\".", $client['username'], $message),
+            'sender' => 'servidor'
+        ];
 
-        Logger::log(sprintf("Cliente #%s enviou: \"%s\".", $this->clientKey, $message), Logger::INFO);
+        $this->sendData($client, $data);
     }
 
     /**
@@ -70,12 +171,17 @@ class Api
      */
     public function quit()
     {
-        $client_socket = $this->clients[$this->clientKey];
+        $client_key = $this->getClientKey($this->clientAddress);
 
-        list($client_ip, $client_port) = Socket::getSocketAddress($client_socket);
-        Socket::closeSocket($client_socket);
-        unset($this->clients[$this->clientKey]);
+        $data = [
+            'message' => 'Cliente desconectado.',
+            'exit' => 1
+        ];
+        $this->sendData($this->clients[$client_key], $data);
+        Socket::closeSocket($this->clients[$client_key]['socket']);
 
-        Logger::log(sprintf("%s:%s se desconectou.", $client_ip, $client_port), Logger::INFO);
+        Logger::log(sprintf("%s se desconectou.", $this->clients[$client_key]['address']), Logger::INFO);
+
+        unset($this->clients[$client_key]);
     }
 }
