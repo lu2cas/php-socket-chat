@@ -79,8 +79,6 @@ class Client
             $this->config->server->address->port
         );
 
-        $this->running = true;
-
         $this->bindUsername();
 
         $this->sendRequest('printWelcomeMessage');
@@ -105,15 +103,15 @@ class Client
             $response = json_decode($response, true);
 
             $output = '';
-            if (array_key_exists('datetime', $response) && !empty($response['datetime'])) {
+            if (!empty($response['datetime'])) {
                 $output .= sprintf("[%s]", $response['datetime']);
             }
 
-            if (array_key_exists('sender', $response) && !empty($response['sender'])) {
+            if (!empty($response['sender'])) {
                 $output .= sprintf("[%s]: ", $response['sender']);
             }
 
-            if (array_key_exists('message', $response) && !empty($response['message'])) {
+            if (!empty($response['message'])) {
                 $output .= sprintf("%s", $response['message']);
             }
 
@@ -121,7 +119,7 @@ class Client
                 printf("%s\n", $output);
             }
 
-            if (array_key_exists('exit', $response) && $response['exit'] == 1) {
+            if ($response['exit'] == 1) {
                 Socket::closeSocket($this->clientSocket);
                 exit(0);
             }

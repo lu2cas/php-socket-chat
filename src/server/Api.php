@@ -100,8 +100,14 @@ class Api
      * @throws Exception
      * @return void
      */
-    private function sendData($client, $data)
+    private function sendData($client, $message, $sender = false, $datetime = false, $exit = false)
     {
+        $data = [];
+        $data['message'] = $message;
+        $data['sender'] = $sender ? $sender : '';
+        $data['datetime'] = $datetime ? date('d/m/Y H:i:s') : '';
+        $data['exit'] = $exit ? 1 : 0;
+
         $data = json_encode($data);
 
         try {
@@ -131,17 +137,13 @@ class Api
     {
         $client = $this->getClient($this->clientAddress);
 
-        $welcome_message = sprintf(
+        $message = sprintf(
             "Bem-vindo, %s!\nVocê está conectado ao servidor com o endereço %s.\n",
             $client['username'],
             $client['address']
         );
 
-        $data = [
-            'message' => $welcome_message
-        ];
-
-        $this->sendData($client, $data);
+        $this->sendData($client, $message);
     }
 
     /**
@@ -155,12 +157,10 @@ class Api
     {
         $client = $this->getClient($this->clientAddress);
 
-        $data = [
-            'message' => sprintf("%s, você disse \"%s\".", $client['username'], $message),
-            'sender' => 'servidor'
-        ];
+        $message = sprintf("%s, você disse \"%s\".", $client['username'], $message);
+        $sender = 'servidor';
 
-        $this->sendData($client, $data);
+        $this->sendData($client, $message, $sender);
     }
 
     /**
@@ -173,11 +173,10 @@ class Api
     {
         $client_key = $this->getClientKey($this->clientAddress);
 
-        $data = [
-            'message' => 'Cliente desconectado.',
-            'exit' => 1
-        ];
-        $this->sendData($this->clients[$client_key], $data);
+        $message = 'Cliente desconectado.';
+        $exit = true;
+
+        $this->sendData($this->clients[$client_key], $message, false, false, $exit);
         Socket::closeSocket($this->clients[$client_key]['socket']);
 
         Logger::log(sprintf("%s se desconectou.", $this->clients[$client_key]['address']), Logger::INFO);

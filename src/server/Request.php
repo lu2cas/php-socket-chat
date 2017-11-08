@@ -59,7 +59,7 @@ class Request
             throw new \Exception('Formato de requisição inválido.');
         }
 
-        $api_class = 'Server\Api';
+        $api_class = '\\Server\\Api';
         $method_reflection = new \ReflectionMethod($api_class, $request['method']);
 
         if (
