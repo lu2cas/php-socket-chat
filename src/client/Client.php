@@ -64,7 +64,7 @@ class Client
         }
         $this->clientSocket = null;
         $this->running = false;
-        $this->stdin = fopen('php://stdin','r');
+        $this->stdin = fopen('php://stdin', 'r');
 
         error_reporting(E_ALL);
         set_time_limit(0);
@@ -85,7 +85,7 @@ class Client
 
         $this->running = true;
 
-        $this->joinServer();
+        $this->bindUsername();
 
         do {
             $this->handleServerResponse();
@@ -105,6 +105,11 @@ class Client
         $this->running = false;
     }
 
+    /**
+     * Manipula as respostas enviadas pelo servidor
+     *
+     * @return void
+     */
     private function handleServerResponse()
     {
         $waiting_for_reading_sockets = Socket::getSocketsWaitingForReading([$this->clientSocket]);
@@ -117,6 +122,11 @@ class Client
         }
     }
 
+    /**
+     * Realiza uma leitura na entrada padrão sem bloquear o processo principal
+     *
+     * @return string|boolean Texto informado, ou false caso não houver entradas
+     */
     public function nonBlockRead() {
         $read = [$this->stdin];
         $null = null;
@@ -131,6 +141,11 @@ class Client
         return trim($input);
     }
 
+    /**
+     * Manipula as entradas do usuário
+     *
+     * @return void
+     */
     private function handleUserInput()
     {
         $input = $this->nonBlockRead();
@@ -155,6 +170,13 @@ class Client
         }
     }
 
+    /**
+     * Cria uma requisição para o servidor
+     *
+     * @param string $method Método a ser executado no servidor
+     * @param array $parameters Parâmetros do método a ser executado
+     * @return string JSON de requisição
+     */
     private function makeRequest($method, $parameters = [])
     {
         $request = [
@@ -167,14 +189,19 @@ class Client
         return $request;
     }
 
-    private function joinServer()
+    /**
+     * Atribui um username informado pelo usuário ao cliente conectado ao servidor
+     *
+     * @return void
+     */
+    private function bindUsername()
     {
         print('Por favor, digite o seu nome de usuário: ');
         $username = fgets($this->stdin);
 
         //@todo Validar nome de usuário
         if (!empty($username)) {
-            $request = $this->makeRequest('join', ['usename' => $username]);
+            $request = $this->makeRequest('bindUsername', ['usename' => $username]);
             Socket::writeOnSocket($this->clientSocket, $request);
         }
     }

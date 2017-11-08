@@ -119,26 +119,34 @@ class Server
      */
     private function acceptClients()
     {
-        $waiting_for_reading_sockets = Socket::getSocketsWaitingForReading(array_merge([$this->serverSocket], $this->clients));
+        $sockets = [$this->serverSocket];
+        foreach ($this->clients as $client) {
+            $sockets[] = $client['socket'];
+        }
+        $waiting_for_reading_sockets = Socket::getSocketsWaitingForReading($sockets);
 
         // Verifica se o servidor recebeu uma nova conexão
         if (in_array($this->serverSocket, $waiting_for_reading_sockets)) {
             $client_socket = Socket::acceptSocket($this->serverSocket);
 
             list($client_ip, $client_port) = Socket::getSocketAddress($client_socket);
-            Logger::log(sprintf("%s:%s se conectou.", $client_ip, $client_port), Logger::INFO);
+            $client_address = sprintf('%s:%s', $client_ip, $client_port);
+            Logger::log(sprintf("%s se conectou.", $client_address), Logger::INFO);
 
-            $this->clients[] = $client_socket;
-            $client_key = array_search($client_socket, $this->clients);
+            $this->clients[] = [
+                'socket' => $client_socket,
+                'address' => $client_address,
+                'username' => null
+            ];
 
             // Envia instruções ao cliente
             $welcome_message = "Bem-vindo ao WhatsLike!\n" .
-            "Você é o cliente #{$client_key}.";
+            "O seu endereço é {$client_address}.";
 
             try {
                 Socket::writeOnSocket($client_socket, $welcome_message);
             } catch(\Exception $e) {
-                Logger::log(sprintf("Falha ao enviar mensagem para o cliente #%s: %s", $client_key, $e->getMessage()), Logger::WARNING);
+                Logger::log(sprintf("Falha ao enviar mensagem para %s: %s", $client_address, $e->getMessage()), Logger::WARNING);
             }
         }
     }
@@ -153,16 +161,16 @@ class Server
     {
         $waiting_for_reading_sockets = Socket::getSocketsWaitingForReading(array_merge([$this->serverSocket], $this->clients));
 
-        foreach ($this->clients as $client_key => $client_socket) {
-            if (in_array($client_socket, $waiting_for_reading_sockets)) {
+        foreach ($this->clients as $client) {
+            if (in_array($client['socket'], $waiting_for_reading_sockets)) {
                 try {
-                    $json_request = Socket::readFromSocket($client_socket);
+                    $json_request = Socket::readFromSocket($client['socket']);
                     $request = new Request($json_request);
                     if ($request->isValid()) {
-                        $this->execute($request, $client_key);
+                        $this->execute($request, $client['username']);
                     }
                 } catch(\Exception $e) {
-                    Logger::log(sprintf("Falha ao executar requisição do cliente #%s: %s", $client_key, $e->getMessage()), Logger::WARNING);
+                    Logger::log(sprintf("Falha ao executar requisição do cliente #%s: %s", $client['username'], $e->getMessage()), Logger::WARNING);
                     continue;
                 }
             }
@@ -177,7 +185,7 @@ class Server
      * @throws Exception
      * @return void
      */
-    private function execute($request, $client_key)
+    private function execute($request, $username)
     {
         $api = new Api($client_key, $this->clients);
 
