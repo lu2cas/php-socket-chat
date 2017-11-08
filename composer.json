@@ -1,5 +1,17 @@
 {
+    "name": "lu2cas/php-socket-chat",
+    "homepage": "http://amphp.org/amp",
+    "description": "Um chat em PHP utilizando sockets TCP.",
+    "license": "GPL v3.0",
+    "authors": [
+        {
+            "name": "Luccas C. Silveira",
+            "email": "contato@lu2cas.com.br"
+        }
+    ],
     "require": {
+        "php": ">=5.4.0",
+        "ext-sockets": "*"
     },
     "autoload": {
         "psr-4": {
