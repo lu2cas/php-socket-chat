@@ -126,6 +126,12 @@ class Socket {
             $buffer = @socket_read($socket, 1024, PHP_NORMAL_READ);
             if ($buffer === false) {
                 $socket_error = socket_strerror(socket_last_error($socket));
+
+                // Fecha um socket caso a cnexão com o mesmo seja encerrada
+                if (socket_last_error($socket) == 104) {
+                    Socket::closeSocket($socket);
+                }
+
                 $error_message = sprintf("Erro ao ler buffer do socket: \"%s\".", $socket_error);
                 throw new \Exception($error_message);
             }
