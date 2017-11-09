@@ -4,6 +4,7 @@ namespace Server;
 
 use Lib\Socket;
 use Lib\Logger;
+use Lib\Input;
 
 /**
  * Classe responsável por criar um servidor capaz de aceitar conexões de
@@ -84,6 +85,7 @@ class Server
         while (true) {
             $this->acceptClients();
             $this->handleClientsRequests();
+            $this->handleUserInput();
         };
     }
 
@@ -131,7 +133,7 @@ class Server
             list($client_ip, $client_port) = Socket::getSocketAddress($client_socket);
             $client_address = sprintf('%s:%s', $client_ip, $client_port);
 
-            Logger::log(sprintf('%s se conectou.', $client_address), Logger::INFO);
+            Logger::log(sprintf('%s conectado.', $client_address), Logger::INFO);
 
             $this->clients[] = [
                 'socket' => $client_socket,
@@ -155,7 +157,7 @@ class Server
         }
         $waiting_for_reading_sockets = Socket::getSocketsWaitingForReading($sockets);
 
-        foreach ($this->clients as $client) {
+        foreach ($this->clients as $client_key => $client) {
             if (in_array($client['socket'], $waiting_for_reading_sockets)) {
                 try {
                     $json_request = Socket::readFromSocket($client['socket']);
@@ -167,6 +169,12 @@ class Server
                         $this->execute($request, $client['address']);
                     }
                 } catch(\Exception $e) {
+                    // Remove um cliente caso a conexão com o mesmo seja encerrada abruptamente
+                    if (socket_last_error($client['socket']) == 104) {
+                        Socket::closeSocket($client['socket']);
+                        unset($this->clients[$client_key]);
+                    }
+
                     Logger::log(sprintf("Falha ao executar requisição de %s: %s", $client['address'], $e->getMessage()), Logger::WARNING);
                     continue;
                 }
@@ -197,4 +205,23 @@ class Server
         $this->clients = $api->getClients();
     }
 
+    /**
+     * Manipula as entradas do usuário
+     *
+     * @return void
+     */
+    private function handleUserInput()
+    {
+        $input = Input::nonBlockRead();
+
+        if (!empty($input)) {
+            switch ($input) {
+                case '/halt':
+                    $this->halt();
+                    break;
+                default:
+                    print("Comando inválido.\n");
+            }
+        }
+    }
 }

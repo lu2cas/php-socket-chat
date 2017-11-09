@@ -4,6 +4,7 @@ namespace Client;
 
 use Lib\Socket;
 use Lib\Logger;
+use Lib\Input;
 
 /**
  * Classe responsável por criar um cliente capaz de se conectar a um servidor
@@ -24,12 +25,6 @@ class Client
      * @var resource
      */
     private $clientSocket;
-
-    /**
-     * Stream da entrada de dados padrão
-     * @var resource
-     */
-    private $stdin;
 
     /**
      * Construtor da classe
@@ -57,8 +52,6 @@ class Client
             throw new \Exception('Formato inválido de arquivo de configurações do cliente.');
         }
         $this->clientSocket = null;
-        $this->running = false;
-        $this->stdin = fopen('php://stdin', 'r');
 
         error_reporting(E_ALL);
         set_time_limit(0);
@@ -127,45 +120,25 @@ class Client
     }
 
     /**
-     * Realiza uma leitura na entrada padrão sem bloquear o processo principal
-     *
-     * @return string|boolean Texto informado, ou false caso não houver entradas
-     */
-    public function nonBlockRead() {
-        $read = [$this->stdin];
-        $null = null;
-        $result = stream_select($read, $null, $null, 0);
-
-        if ($result === 0) {
-            return false;
-        }
-
-        $input = fgets($this->stdin);
-
-        return trim($input);
-    }
-
-    /**
      * Manipula as entradas do usuário
      *
      * @return void
      */
     private function handleUserInput()
     {
-        $input = $this->nonBlockRead();
+        $input = Input::nonBlockRead();
 
         if (!empty($input)) {
-            $input = trim($input);
+            //@todo Implementar o parser do $input
             $input = explode(' ', $input);
-
             $method = array_shift($input);
             $parameters = $input;
 
             switch ($method) {
-                case '/e':
+                case '/echo':
                     $this->sendRequest('echo', ['message' => $parameters[0]]);
                     break;
-                case '/q':
+                case '/quit':
                     $this->sendRequest('quit');
                     break;
                 default:
@@ -201,8 +174,7 @@ class Client
      */
     private function bindUsername()
     {
-        print('Por favor, digite o seu nome de usuário: ');
-        $username = fgets($this->stdin);
+        $username = Input::read('Por favor, digite o seu nome de usuário');
 
         //@todo Validar nome de usuário
         $username = trim($username);

@@ -34,7 +34,7 @@ class Api
      * @param array $clients Conjunto de clientes conectados ao servidor
      * @return void
      */
-    public function __construct($client_address, $clients)
+    public function __construct($client_address, &$clients)
     {
         $this->clientAddress = $client_address;
         $this->clients = $clients;
@@ -179,7 +179,7 @@ class Api
         $this->sendData($this->clients[$client_key], $message, false, false, $exit);
         Socket::closeSocket($this->clients[$client_key]['socket']);
 
-        Logger::log(sprintf("%s se desconectou.", $this->clients[$client_key]['address']), Logger::INFO);
+        Logger::log(sprintf("%s desconectado.", $this->clients[$client_key]['address']), Logger::INFO);
 
         unset($this->clients[$client_key]);
     }

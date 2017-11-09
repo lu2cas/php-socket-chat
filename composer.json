@@ -1,8 +1,7 @@
 {
     "name": "lu2cas/php-socket-chat",
-    "homepage": "http://amphp.org/amp",
-    "description": "Um chat em PHP utilizando sockets TCP.",
-    "license": "GPL v3.0",
+    "description": "Chat em modo de texto implemetado em PHP utilizando sockets TCP.",
+    "license": "GNU General Public License v3.0",
     "authors": [
         {
             "name": "Luccas C. Silveira",
