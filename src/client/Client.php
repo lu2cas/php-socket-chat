@@ -129,14 +129,11 @@ class Client
         $input = Input::nonBlockRead();
 
         if (!empty($input)) {
-            //@todo Implementar o parser do $input
-            $input = explode(' ', $input);
-            $method = array_shift($input);
-            $parameters = $input;
+            list($command, $parameters) = $this->parseInput($input);
 
-            switch ($method) {
+            switch ($command) {
                 case '/echo':
-                    $this->sendRequest('echo', ['message' => $parameters[0]]);
+                    $this->sendRequest('echo', ['message' => current($parameters)]);
                     break;
                 case '/quit':
                     $this->sendRequest('quit');
@@ -146,6 +143,34 @@ class Client
                     break;
             }
         }
+    }
+
+    /**
+     * Analisa e formata a entrada do usuário
+     *
+     * @return array Comando e parâmetros
+     */
+    public function parseInput($input)
+    {
+        $parsed_input = [
+            'command' => null,
+            'parameters' => []
+        ];
+
+        if (strpos($input, '/') === 0) {
+            $input = explode(' ', $input);
+            $command = array_shift($input);
+            $parameters = count($input) > 0 ? $input : [];
+
+            if (in_array($command, ['/echo'])) {
+                $parameters = [implode(' ', $parameters)];
+            }
+
+            $parsed_input['command'] = $command;
+            $parsed_input['parameters'] = $parameters;
+        }
+
+        return array_values($parsed_input);
     }
 
     /**
