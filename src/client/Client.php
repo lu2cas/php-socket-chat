@@ -157,17 +157,24 @@ class Client
             'parameters' => []
         ];
 
-        if (strpos($input, '/') === 0) {
-            $input = explode(' ', $input);
-            $command = array_shift($input);
-            $parameters = count($input) > 0 ? $input : [];
+        if (substr($input, 0, 1) == '/') {
+            $space = strpos($input, ' ');
 
-            if (in_array($command, ['/echo'])) {
-                $parameters = [implode(' ', $parameters)];
+            if ($space !== false) {
+                $command = substr($input, 0, $space);
+                $parameters = trim(substr($input, $space));
+
+                if (!in_array($command, ['/echo'])) {
+                    $parameters = explode($parameters, ' ');
+                } else {
+                    $parameters = [$parameters];
+                }
+
+                $parsed_input['command'] = $command;
+                $parsed_input['parameters'] = $parameters;
+            } else {
+                $parsed_input['command'] = $input;
             }
-
-            $parsed_input['command'] = $command;
-            $parsed_input['parameters'] = $parameters;
         }
 
         return array_values($parsed_input);
