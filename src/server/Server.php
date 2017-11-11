@@ -101,8 +101,8 @@ class Server
         $request = new Request($json_request);
 
         if ($request->isValid()) {
-            foreach ($this->clients as $client) {
-                $this->execute($request, $client['address']);
+            foreach ($this->clients as $client_key => $client) {
+                $this->execute($request, $client_key);
             }
         }
 
@@ -135,7 +135,8 @@ class Server
 
             Logger::log(sprintf('%s conectado.', $client_address), Logger::INFO);
 
-            $this->clients[] = [
+            $client_key = sha1(date('YmdHis') . $client_address);
+            $this->clients[$client_key] = [
                 'socket' => $client_socket,
                 'address' => $client_address,
                 'username' => null
@@ -166,7 +167,7 @@ class Server
 
                     $request = new Request($json_request);
                     if ($request->isValid()) {
-                        $this->execute($request, $client['address']);
+                        $this->execute($request, $client_key);
                     }
                 } catch(\Exception $e) {
                     // Remove um cliente caso a conexão com o mesmo seja encerrada abruptamente
@@ -186,13 +187,13 @@ class Server
      * Interpreta e valida uma requisição
      *
      * @param \Server\Request $request Objeto de requisição
-     * @param string $client_address Endereço do cliente que realiza a requisição
+     * @param int $client_key Chave do cliente que realiza a requisição
      * @throws Exception
      * @return void
      */
-    private function execute($request, $client_address)
+    private function execute($request, $client_key)
     {
-        $api = new Api($client_address, $this->clients);
+        $api = new Api($client_key, $this->clients);
 
         call_user_func_array(
             [

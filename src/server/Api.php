@@ -14,11 +14,11 @@ use Lib\Logger;
 class Api
 {
     /**
-    * Cliente que realiza a requisição
+    * Chave do cliente que realiza a requisição
     *
-    * @var array
+    * @var int
     */
-    private $client;
+    private $client_key;
 
     /**
      * Conjunto de clientes conectados ao servidor
@@ -34,12 +34,10 @@ class Api
      * @param array $clients Conjunto de clientes conectados ao servidor
      * @return void
      */
-    public function __construct($client_address, &$clients)
+    public function __construct($client_key, &$clients)
     {
-        $this->clientAddress = $client_address;
+        $this->clientKey = $client_key;
         $this->clients = $clients;
-
-        $client_key = $this->getClientKey($client_address);
     }
 
     /**
@@ -55,16 +53,17 @@ class Api
     /**
      * Retorna a chave de um cliente no conjunto de clientes conectados
      *
-     * @param string $address Endereço do cliente
+     * @param string $identifier Valor do identificador de cliente
+     * @param string $target Nome do identificador de cliente
      * @return int
      */
-    private function getClientKey($address)
+    private function getClientKey($identifier, $target = 'address')
     {
         $found_key = null;
 
-        foreach ($this->clients as $key => $client) {
-            if ($client['address'] == $address) {
-                $found_key = $key;
+        foreach ($this->clients as $client_key => $client) {
+            if ($client[$target] == $identifier) {
+                $found_key = $client_key;
                 break;
             }
         }
@@ -78,15 +77,14 @@ class Api
      * @param string $address Endereço do cliente
      * @return array
      */
-    private function getClient($address)
+    private function getClient($identifier, $target = 'address')
     {
         $found_client = null;
 
-        foreach ($this->clients as $client) {
-            if ($client['address'] == $address) {
-                $found_client = $client;
-                break;
-            }
+        $client_key = $this->getClientKey($identifier, $target);
+
+        if (!is_null($client_key)) {
+            $found_client = $this->clients[$client_key];
         }
 
         return $found_client;
@@ -95,25 +93,29 @@ class Api
     /**
      * Formata e envia dados para um cliente
      *
-     * @param array $client Registro do cliente de destino
-     * @param array $message Dados a serem enviados
+     * @param array $recipient Registro do cliente de destino
+     * @param string $message Dados a serem enviados
+     * @param string $sender Username do cliente que envia os dados
+     * @param boolean $datetime Anexar data e hora de envio à mensage?
+     * @param boolean $exit Desconetar cliente de destino?
      * @throws Exception
      * @return void
      */
-    private function sendData($client, $message, $sender = false, $datetime = false, $exit = false)
+    private function sendData($recipient, $message, $sender = null, $datetime = false, $exit = false)
     {
-        $data = [];
-        $data['message'] = $message;
-        $data['sender'] = $sender ? $sender : '';
-        $data['datetime'] = $datetime ? date('d/m/Y H:i:s') : '';
-        $data['exit'] = $exit ? 1 : 0;
+        $data = [
+            'message' => $message,
+            'sender' => is_null($sender) ? '' : $sender,
+            'datetime' => $datetime ? date('d/m/Y H:i:s') : '',
+            'exit' => $exit ? 1 : 0
+        ];
 
         $data = json_encode($data);
 
         try {
-            Socket::writeOnSocket($client['socket'], $data);
+            Socket::writeOnSocket($recipient['socket'], $data);
         } catch(\Exception $e) {
-            Logger::log(sprintf("Falha ao enviar dados para %s: %s", $client['address'], $e->getMessage()), Logger::WARNING);
+            Logger::log(sprintf("Falha ao enviar dados para %s: %s", $recipient['address'], $e->getMessage()), Logger::WARNING);
         }
     }
 
@@ -124,8 +126,7 @@ class Api
      */
     public function bindUsername($username)
     {
-        $client_key = $this->getClientKey($this->clientAddress);
-        $this->clients[$client_key]['username'] = $username;
+        $this->clients[$this->clientKey]['username'] = $username;
     }
 
     /**
@@ -135,7 +136,7 @@ class Api
      */
     public function printWelcomeMessage()
     {
-        $client = $this->getClient($this->clientAddress);
+        $client = $this->clients[$this->clientKey];
 
         $message = sprintf(
             "Bem-vindo, %s!\nVocê está conectado ao servidor com o endereço %s.\n",
@@ -155,7 +156,7 @@ class Api
      */
     public function echo($message)
     {
-        $client = $this->getClient($this->clientAddress);
+        $client = $this->clients[$this->clientKey];
 
         $message = sprintf("%s, você disse \"%s\".", $client['username'], $message);
         $sender = 'servidor';
@@ -171,16 +172,32 @@ class Api
      */
     public function quit()
     {
-        $client_key = $this->getClientKey($this->clientAddress);
+        $client = $this->clients[$this->clientKey];
 
         $message = 'Cliente desconectado.';
         $exit = true;
 
-        $this->sendData($this->clients[$client_key], $message, false, false, $exit);
-        Socket::closeSocket($this->clients[$client_key]['socket']);
+        $this->sendData($client, $message, false, false, $exit);
+        Socket::closeSocket($client['socket']);
 
-        Logger::log(sprintf("%s desconectado.", $this->clients[$client_key]['address']), Logger::INFO);
+        Logger::log(sprintf("%s desconectado.", $client['address']), Logger::INFO);
 
-        unset($this->clients[$client_key]);
+        unset($this->clients[$this->clientKey]);
+    }
+
+    /**
+     * Envia uma mensagem para um cliente
+     *
+     * @throws Exception
+     * @return void
+     */
+    public function sendMessage($message, $username)
+    {
+        $sender = $this->clients[$this->clientKey];
+        $recipient = $this->getClient($username, 'username');
+
+        if (!is_null($recipient)) {
+            $this->sendData($recipient, $message, $sender['username'], true);
+        }
     }
 }

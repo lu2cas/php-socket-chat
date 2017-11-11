@@ -27,6 +27,18 @@ class Client
     private $clientSocket;
 
     /**
+     * Username do cliente selecionado para conversa privada
+     * @var string
+     */
+    private $activeRecipient;
+
+    /**
+     * Nome do grupo selecionado para conversa em grupo
+     * @var string
+     */
+    private $activeGroup;
+
+    /**
      * Construtor da classe
      *
      * @return void
@@ -51,7 +63,10 @@ class Client
         if (json_last_error() !== JSON_ERROR_NONE) {
             throw new \Exception('Formato inválido de arquivo de configurações do cliente.');
         }
+
         $this->clientSocket = null;
+        $this->activeRecipient = null;
+        $this->activeGroup = null;
 
         error_reporting(E_ALL);
         set_time_limit(0);
@@ -129,18 +144,28 @@ class Client
         $input = Input::nonBlockRead();
 
         if (!empty($input)) {
-            list($command, $parameters) = $this->parseInput($input);
-
-            switch ($command) {
-                case '/echo':
-                    $this->sendRequest('echo', ['message' => current($parameters)]);
-                    break;
-                case '/quit':
-                    $this->sendRequest('quit');
-                    break;
-                default:
-                    print("Comando inválido.\n");
-                    break;
+            if (!is_null($this->activeRecipient)) {
+                if ($input == '/exit') {
+                    $this->activeRecipient = null;
+                } else {
+                    $this->sendRequest('sendMessage', ['username' => $this->activeRecipient, 'message' => $input]);
+                }
+            } else {
+                list($command, $parameters) = $this->parseInput($input);
+                switch ($command) {
+                    case '/echo':
+                        $this->sendRequest('echo', ['message' => current($parameters)]);
+                        break;
+                    case '/quit':
+                        $this->sendRequest('quit');
+                        break;
+                    case '/privatechat':
+                        $this->startPrivateChat(current($parameters));
+                        break;
+                    default:
+                        print("Comando inválido.\n");
+                        break;
+                }
             }
         }
     }
@@ -164,10 +189,10 @@ class Client
                 $command = substr($input, 0, $space);
                 $parameters = trim(substr($input, $space));
 
-                if (!in_array($command, ['/echo'])) {
-                    $parameters = explode($parameters, ' ');
-                } else {
+                if (in_array($command, ['/echo', '/privatechat'])) {
                     $parameters = [$parameters];
+                } else {
+                    $parameters = explode($parameters, ' ');
                 }
 
                 $parsed_input['command'] = $command;
@@ -216,5 +241,21 @@ class Client
         }
 
         print("\n");
+    }
+
+    /**
+     * Inicia um chat privado
+     *
+     * @param string $username Username do usuário de destino do chat privado
+     * @return void
+     */
+    private function startPrivateChat($username)
+    {
+        //@todo Validar username
+        $this->activeRecipient = $username;
+
+        // Limpa a tela
+        print(chr(27).chr(91).'H'.chr(27).chr(91).'J');
+        printf("Você está em um chat privado com %s.\n\n", $this->activeRecipient);
     }
 }
