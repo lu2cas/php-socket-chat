@@ -51,40 +51,20 @@ class Api
     }
 
     /**
-     * Retorna a chave de um cliente no conjunto de clientes conectados
-     *
-     * @param string $identifier Valor do identificador de cliente
-     * @param string $target Nome do identificador de cliente
-     * @return int
-     */
-    private function getClientKey($identifier, $target = 'address')
-    {
-        $found_key = null;
-
-        foreach ($this->clients as $client_key => $client) {
-            if ($client[$target] == $identifier) {
-                $found_key = $client_key;
-                break;
-            }
-        }
-
-        return $found_key;
-    }
-
-    /**
      * Retorna o registro de um cliente
      *
      * @param string $address Endereço do cliente
      * @return array
      */
-    private function getClient($identifier, $target = 'address')
+    private function getClient($identifier, $target = 'username')
     {
         $found_client = null;
 
-        $client_key = $this->getClientKey($identifier, $target);
-
-        if (!is_null($client_key)) {
-            $found_client = $this->clients[$client_key];
+        foreach ($this->clients as $client_key => $client) {
+            if ($client[$target] == $identifier) {
+                $found_client = $client;
+                break;
+            }
         }
 
         return $found_client;
@@ -94,26 +74,56 @@ class Api
      * Formata e envia dados para um cliente
      *
      * @param array $recipient Registro do cliente de destino
-     * @param string $message Dados a serem enviados
-     * @param string $sender Username do cliente que envia os dados
-     * @param boolean $datetime Anexar data e hora de envio à mensage?
-     * @param boolean $exit Desconetar cliente de destino?
+     * @param string $message Mensagem a ser enviada
+     * @param string $sender_username Username do remetente; null, se o remetente for o servidor
      * @throws Exception
      * @return void
      */
-    private function sendData($recipient, $message, $sender = null, $datetime = false, $exit = false)
+    private function sendMessage($recipient, $message, $sender_username = null)
     {
         $data = [
+            'type' => 'message',
             'message' => $message,
-            'sender' => is_null($sender) ? '' : $sender,
-            'datetime' => $datetime ? date('d/m/Y H:i:s') : '',
-            'exit' => $exit ? 1 : 0
+            'sender_username' => is_null($sender_username) ? '' : $sender_username,
+            'datetime' => date('d/m/Y H:i:s')
         ];
 
         $data = json_encode($data);
 
         try {
             Socket::writeOnSocket($recipient['socket'], $data);
+        } catch(\Exception $e) {
+            Logger::log(sprintf("Falha ao enviar dados para %s: %s", $recipient['address'], $e->getMessage()), Logger::WARNING);
+        }
+    }
+
+    /**
+     * Formata e envia a resposta de um método para um cliente
+     *
+     * @param string $method Método solicitado
+     * @param boolean $success Sucesso da execução do método
+     * @param string $message Mensagem gerada pelo método
+     * @param array $data Dados retornados pelo método
+     * @throws Exception
+     * @return void
+     */
+    private function sendResponse($method, $success, $message, $data = null)
+    {
+        $recipient = $this->clients[$this->clientKey];
+
+        $response = [
+            'type' => 'response',
+            'method' => $method,
+            'success' => $success ? 1 : 0,
+            'message' => $message,
+            'data' => $data,
+            'datetime' => date('d/m/Y H:i:s')
+        ];
+
+        $response = json_encode($response);
+
+        try {
+            Socket::writeOnSocket($recipient['socket'], $response);
         } catch(\Exception $e) {
             Logger::log(sprintf("Falha ao enviar dados para %s: %s", $recipient['address'], $e->getMessage()), Logger::WARNING);
         }
@@ -136,15 +146,15 @@ class Api
      */
     public function printWelcomeMessage()
     {
-        $client = $this->clients[$this->clientKey];
+        $recipient = $this->clients[$this->clientKey];
 
         $message = sprintf(
             "Bem-vindo, %s!\nVocê está conectado ao servidor com o endereço %s.\n",
-            $client['username'],
-            $client['address']
+            $recipient['username'],
+            $recipient['address']
         );
 
-        $this->sendData($client, $message);
+        $this->sendMessage($recipient, $message);
     }
 
     /**
@@ -156,12 +166,11 @@ class Api
      */
     public function echo($message)
     {
-        $client = $this->clients[$this->clientKey];
+        $recipient = $this->clients[$this->clientKey];
 
-        $message = sprintf("%s, você disse \"%s\".", $client['username'], $message);
-        $sender = 'servidor';
+        $message = sprintf("%s, você disse \"%s\".", $recipient['username'], $message);
 
-        $this->sendData($client, $message, $sender);
+        $this->sendMessage($recipient, $message);
     }
 
     /**
@@ -172,15 +181,13 @@ class Api
      */
     public function quit()
     {
-        $client = $this->clients[$this->clientKey];
+        $recipient = $this->clients[$this->clientKey];
 
-        $message = 'Cliente desconectado.';
-        $exit = true;
+        $this->sendResponse('quit', true, 'Desconectando cliente...');
 
-        $this->sendData($client, $message, false, false, $exit);
-        Socket::closeSocket($client['socket']);
+        Socket::closeSocket($recipient['socket']);
 
-        Logger::log(sprintf("%s desconectado.", $client['address']), Logger::INFO);
+        Logger::log(sprintf("%s desconectado.", $recipient['address']), Logger::INFO);
 
         unset($this->clients[$this->clientKey]);
     }
@@ -191,13 +198,12 @@ class Api
      * @throws Exception
      * @return void
      */
-    public function sendMessage($message, $username)
+    public function sendChatMessage($recipient_username, $message)
     {
-        $sender = $this->clients[$this->clientKey];
-        $recipient = $this->getClient($username, 'username');
+        $recipient = $this->getClient($recipient_username);
 
         if (!is_null($recipient)) {
-            $this->sendData($recipient, $message, $sender['username'], true);
+            $this->sendMessage($recipient, $message, $this->clients[$this->clientKey]['username']);
         }
     }
 }

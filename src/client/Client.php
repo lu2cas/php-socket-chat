@@ -30,13 +30,13 @@ class Client
      * Username do cliente selecionado para conversa privada
      * @var string
      */
-    private $activeRecipient;
+    private $activeRecipientUsername;
 
     /**
      * Nome do grupo selecionado para conversa em grupo
      * @var string
      */
-    private $activeGroup;
+    private $activeGroupName;
 
     /**
      * Construtor da classe
@@ -65,7 +65,7 @@ class Client
         }
 
         $this->clientSocket = null;
-        $this->activeRecipient = null;
+        $this->activeRecipientUsername = null;
         $this->activeGroup = null;
 
         error_reporting(E_ALL);
@@ -92,7 +92,7 @@ class Client
         $this->sendRequest('printWelcomeMessage');
 
         while (true) {
-            $this->handleServerResponse();
+            $this->handleServerMessages();
             $this->handleUserInput();
         }
     }
@@ -102,34 +102,20 @@ class Client
      *
      * @return void
      */
-    private function handleServerResponse()
+    private function handleServerMessages()
     {
         $waiting_for_reading_sockets = Socket::getSocketsWaitingForReading([$this->clientSocket]);
 
         if (!empty($waiting_for_reading_sockets)) {
-            $response = Socket::readFromSocket($this->clientSocket);
-            $response = json_decode($response, true);
+            $data = Socket::readFromSocket($this->clientSocket);
+            $data = json_decode($data, true);
 
-            $output = '';
-            if (!empty($response['datetime'])) {
-                $output .= sprintf("[%s]", $response['datetime']);
-            }
-
-            if (!empty($response['sender'])) {
-                $output .= sprintf("[%s]: ", $response['sender']);
-            }
-
-            if (!empty($response['message'])) {
-                $output .= sprintf("%s", $response['message']);
-            }
-
-            if (!empty($output)) {
-                printf("%s\n", $output);
-            }
-
-            if ($response['exit'] == 1) {
-                Socket::closeSocket($this->clientSocket);
-                exit(0);
+            if ($data['type'] == 'message') {
+                if (empty($data['sender_username'])) {
+                    printf("%s\n", $data['message']);
+                } else if ($data['sender_username'] == $this->activeRecipientUsername) {
+                    printf("[%s][%s]: %s\n", $data['datetime'], $data['sender_username'], $data['message']);
+                }
             }
         }
     }
@@ -144,11 +130,11 @@ class Client
         $input = Input::nonBlockRead();
 
         if (!empty($input)) {
-            if (!is_null($this->activeRecipient)) {
+            if (!is_null($this->activeRecipientUsername)) {
                 if ($input == '/exit') {
-                    $this->activeRecipient = null;
+                    $this->activeRecipientUsername = null;
                 } else {
-                    $this->sendRequest('sendMessage', ['username' => $this->activeRecipient, 'message' => $input]);
+                    $this->sendRequest('sendChatMessage', ['recipient_username' => $this->activeRecipientUsername, 'message' => $input]);
                 }
             } else {
                 list($command, $parameters) = $this->parseInput($input);
@@ -157,7 +143,7 @@ class Client
                         $this->sendRequest('echo', ['message' => current($parameters)]);
                         break;
                     case '/quit':
-                        $this->sendRequest('quit');
+                        $this->quit();
                         break;
                     case '/privatechat':
                         $this->startPrivateChat(current($parameters));
@@ -251,11 +237,27 @@ class Client
      */
     private function startPrivateChat($username)
     {
-        //@todo Validar username
-        $this->activeRecipient = $username;
+        $this->activeRecipientUsername = trim($username);
 
         // Limpa a tela
-        print(chr(27).chr(91).'H'.chr(27).chr(91).'J');
-        printf("Você está em um chat privado com %s.\n\n", $this->activeRecipient);
+        print(chr(27) . chr(91) . 'H' . chr(27) . chr(91) . 'J');
+        printf("Você está em um chat privado com %s.\n\n", $this->activeRecipientUsername);
+    }
+
+    private function quit() {
+        $this->sendRequest('quit');
+
+        while (true) {
+            $waiting_for_reading_sockets = Socket::getSocketsWaitingForReading([$this->clientSocket]);
+
+            if (!empty($waiting_for_reading_sockets)) {
+                $data = Socket::readFromSocket($this->clientSocket);
+                $data = json_decode($data, true);
+                if ($data['type'] == 'response' && $data['method'] == 'quit') {
+                    printf("%s\n", $data['message']);
+                    exit(0);
+                }
+            }
+        }
     }
 }

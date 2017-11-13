@@ -97,13 +97,8 @@ class Server
      */
     public function halt()
     {
-        $json_request = json_encode(['method' => 'quit', 'parameters' => []]);
-        $request = new Request($json_request);
-
-        if ($request->isValid()) {
-            foreach ($this->clients as $client_key => $client) {
-                $this->execute($request, $client_key);
-            }
+        foreach ($this->clients as $client) {
+            Socket::closeSocket($client['socket']);
         }
 
         Socket::closeSocket($this->serverSocket);
