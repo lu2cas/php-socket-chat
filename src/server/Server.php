@@ -86,6 +86,7 @@ class Server
             $this->acceptClients();
             $this->handleClientsRequests();
             $this->handleUserInput();
+            usleep(250);
         };
     }
 
@@ -119,7 +120,7 @@ class Server
         foreach ($this->clients as $client) {
             $sockets[] = $client['socket'];
         }
-        $waiting_for_reading_sockets = Socket::getSocketsWaitingForReading($sockets);
+        $waiting_for_reading_sockets = Socket::getSocketsWaitingForReading($sockets, 0);
 
         // Verifica se o servidor recebeu uma nova conexão
         if (in_array($this->serverSocket, $waiting_for_reading_sockets)) {
@@ -151,7 +152,7 @@ class Server
         foreach ($this->clients as $client) {
             $sockets[] = $client['socket'];
         }
-        $waiting_for_reading_sockets = Socket::getSocketsWaitingForReading($sockets);
+        $waiting_for_reading_sockets = Socket::getSocketsWaitingForReading($sockets, 0);
 
         foreach ($this->clients as $client_key => $client) {
             if (in_array($client['socket'], $waiting_for_reading_sockets)) {
@@ -208,7 +209,7 @@ class Server
      */
     private function handleUserInput()
     {
-        $input = Input::nonBlockRead();
+        $input = Input::nonBlockingRead();
 
         if (!empty($input)) {
             switch ($input) {

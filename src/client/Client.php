@@ -39,6 +39,12 @@ class Client
     private $activeGroupName;
 
     /**
+     * Conjunto de respostas retornadas pelo servidor
+     * @var array
+     */
+    private $responsesBuffer;
+
+    /**
      * Construtor da classe
      *
      * @return void
@@ -92,8 +98,10 @@ class Client
         $this->sendRequest('printWelcomeMessage');
 
         while (true) {
-            $this->handleServerMessages();
+            //$this->handleServerMessages();
+            $this->handleServerResponses();
             $this->handleUserInput();
+            usleep(250);
         }
     }
 
@@ -102,9 +110,9 @@ class Client
      *
      * @return void
      */
-    private function handleServerMessages()
+    private function handleServerResponses()
     {
-        $waiting_for_reading_sockets = Socket::getSocketsWaitingForReading([$this->clientSocket]);
+        $waiting_for_reading_sockets = Socket::getSocketsWaitingForReading([$this->clientSocket], 0);
 
         if (!empty($waiting_for_reading_sockets)) {
             $data = Socket::readFromSocket($this->clientSocket);
@@ -116,6 +124,8 @@ class Client
                 } else if ($data['sender_username'] == $this->activeRecipientUsername) {
                     printf("[%s][%s]: %s\n", $data['datetime'], $data['sender_username'], $data['message']);
                 }
+            } else if ($data['type'] == 'response') {
+                $this->responsesBuffer[] = $data;
             }
         }
     }
@@ -127,7 +137,7 @@ class Client
      */
     private function handleUserInput()
     {
-        $input = Input::nonBlockRead();
+        $input = Input::nonBlockingRead();
 
         if (!empty($input)) {
             if (!is_null($this->activeRecipientUsername)) {
@@ -247,17 +257,21 @@ class Client
     private function quit() {
         $this->sendRequest('quit');
 
+        $response = null;
         while (true) {
-            $waiting_for_reading_sockets = Socket::getSocketsWaitingForReading([$this->clientSocket]);
-
-            if (!empty($waiting_for_reading_sockets)) {
-                $data = Socket::readFromSocket($this->clientSocket);
-                $data = json_decode($data, true);
-                if ($data['type'] == 'response' && $data['method'] == 'quit') {
-                    printf("%s\n", $data['message']);
-                    exit(0);
+            $this->handleServerResponses();
+            if (!empty($this->responsesBuffer)) {
+                foreach ($this->responsesBuffer as $buffered_response_key => $buffered_response) {
+                    if ($buffered_response['method'] == 'quit') {
+                        $response = $buffered_response;
+                        unset($this->responsesBuffer[$buffered_response_key]);
+                        break 2;
+                    }
                 }
             }
         }
+
+        printf("%s\n", $response['message']);
+        exit(0);
     }
 }

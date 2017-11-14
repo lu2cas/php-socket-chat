@@ -107,7 +107,7 @@ class Api
      * @throws Exception
      * @return void
      */
-    private function sendResponse($method, $success, $message, $data = null)
+    private function sendResponse($method, $success, $message = null, $data = null)
     {
         $recipient = $this->clients[$this->clientKey];
 
@@ -115,8 +115,8 @@ class Api
             'type' => 'response',
             'method' => $method,
             'success' => $success ? 1 : 0,
-            'message' => $message,
-            'data' => $data,
+            'message' => is_null($message) ? '' : $message,
+            'data' => empty($data) ? '' : $data,
             'datetime' => date('d/m/Y H:i:s')
         ];
 

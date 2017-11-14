@@ -127,7 +127,7 @@ class Socket {
             if ($buffer === false) {
                 $socket_error = socket_strerror(socket_last_error($socket));
 
-                $error_message = sprintf("Erro ao ler buffer do socket: \"%s\".", $socket_error);
+                $error_message = sprintf("Erro ao ler buffer do socket remoto: \"%s\".", $socket_error);
                 throw new \Exception($error_message);
             }
 
@@ -145,12 +145,12 @@ class Socket {
      * @param array $sockets Conjunto de sockets a serem inspecionados
      * @return array Conjunto de sockets que contém dados a serem consumidos
      */
-    public static function getSocketsWaitingForReading($sockets)
+    public static function getSocketsWaitingForReading($sockets, $timeout = null)
     {
         $sockets_waiting_for_reading = [];
 
         $null = null;
-        $selected_sockets = @socket_select($sockets, $null, $null, 0);
+        $selected_sockets = @socket_select($sockets, $null, $null, $timeout);
 
         if ($selected_sockets === false) {
             throw new \Exception("Erro ao inspecionar sockets para leitura.");

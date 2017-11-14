@@ -15,7 +15,7 @@ class Input
      *
      * @return string Texto informado, ou null caso não houver entrada
      */
-    public static function nonBlockRead() {
+    public static function nonBlockingRead() {
         $stdin = fopen('php://stdin', 'r');
 
         $read = [$stdin];
