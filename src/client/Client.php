@@ -98,7 +98,6 @@ class Client
         $this->sendRequest('printWelcomeMessage');
 
         while (true) {
-            //$this->handleServerMessages();
             $this->handleServerResponses();
             $this->handleUserInput();
             usleep(250);
@@ -220,6 +219,26 @@ class Client
         Socket::writeOnSocket($this->clientSocket, $request);
     }
 
+    private function getBufferedResponse($method, $timeout) {
+        $response = null;
+
+        $start = time();
+        while (time() < $start + $timeout) {
+            $this->handleServerResponses();
+            if (!empty($this->responsesBuffer)) {
+                foreach ($this->responsesBuffer as $buffered_response_key => $buffered_response) {
+                    if ($buffered_response['method'] == $method) {
+                        $response = $buffered_response;
+                        unset($this->responsesBuffer[$buffered_response_key]);
+                        break 2;
+                    }
+                }
+            }
+        }
+
+        return $response;
+    }
+
     /**
      * Atribui um username informado pelo usuário ao cliente conectado ao servidor
      *
@@ -256,20 +275,7 @@ class Client
 
     private function quit() {
         $this->sendRequest('quit');
-
-        $response = null;
-        while (true) {
-            $this->handleServerResponses();
-            if (!empty($this->responsesBuffer)) {
-                foreach ($this->responsesBuffer as $buffered_response_key => $buffered_response) {
-                    if ($buffered_response['method'] == 'quit') {
-                        $response = $buffered_response;
-                        unset($this->responsesBuffer[$buffered_response_key]);
-                        break 2;
-                    }
-                }
-            }
-        }
+        $response = $this->getBufferedResponse('quit', 5);
 
         printf("%s\n", $response['message']);
         exit(0);
