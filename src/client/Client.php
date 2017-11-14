@@ -205,13 +205,15 @@ class Client
      *
      * @param string $method Método a ser executado no servidor
      * @param array $parameters Parâmetros do método a ser executado
+     * @param string $token Identificador para requisições síncronas
      * @return void
      */
-    private function sendRequest($method, $parameters = [])
+    private function sendRequest($method, $parameters = [], $token = null)
     {
         $request = [
             'method' => $method,
-            'parameters' => $parameters
+            'parameters' => $parameters,
+            'token' => $token
         ];
 
         $request = json_encode($request);
@@ -219,7 +221,14 @@ class Client
         Socket::writeOnSocket($this->clientSocket, $request);
     }
 
-    private function getBufferedResponse($method, $timeout) {
+    /**
+     * Recupera a resposta de uma requisição síncrona
+     *
+     * @param string $method Método a ser executado no servidor
+     * @param int $timeout Tempo máximo em segundos para aguardar resposta do servidor
+     * @return array|null Resposta de requisição síncrona; null, caso não houver resposta
+     */
+    private function getBufferedResponse($token, $timeout) {
         $response = null;
 
         $start = time();
@@ -227,7 +236,7 @@ class Client
             $this->handleServerResponses();
             if (!empty($this->responsesBuffer)) {
                 foreach ($this->responsesBuffer as $buffered_response_key => $buffered_response) {
-                    if ($buffered_response['method'] == $method) {
+                    if ($buffered_response['token'] == $token) {
                         $response = $buffered_response;
                         unset($this->responsesBuffer[$buffered_response_key]);
                         break 2;
@@ -273,9 +282,16 @@ class Client
         printf("Você está em um chat privado com %s.\n\n", $this->activeRecipientUsername);
     }
 
+    /**
+     * Encerra as atividades do cliente
+     *
+     * @return void
+     */
     private function quit() {
-        $this->sendRequest('quit');
-        $response = $this->getBufferedResponse('quit', 5);
+        $token = sha1('quit' . microtime());
+
+        $this->sendRequest('quit', ['token' => $token]);
+        $response = $this->getBufferedResponse($token, 5);
 
         printf("%s\n", $response['message']);
         exit(0);

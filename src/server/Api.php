@@ -102,12 +102,13 @@ class Api
      *
      * @param string $method Método solicitado
      * @param boolean $success Sucesso da execução do método
+     * @param boolean $token Identificador da requisição síncrona
      * @param string $message Mensagem gerada pelo método
-     * @param array $data Dados retornados pelo método
+     * @param array $data Dados gerados pelo método
      * @throws Exception
      * @return void
      */
-    private function sendResponse($method, $success, $message = null, $data = null)
+    private function sendResponse($method, $success, $token, $message = null, $data = null)
     {
         $recipient = $this->clients[$this->clientKey];
 
@@ -117,7 +118,8 @@ class Api
             'success' => $success ? 1 : 0,
             'message' => is_null($message) ? '' : $message,
             'data' => empty($data) ? '' : $data,
-            'datetime' => date('d/m/Y H:i:s')
+            'datetime' => date('d/m/Y H:i:s'),
+            'token' => $token
         ];
 
         $response = json_encode($response);
@@ -176,14 +178,15 @@ class Api
     /**
      * Desconecta um cliente do servidor
      *
+     * @param string $token Identificador de requisição síncrona
      * @throws Exception
      * @return void
      */
-    public function quit()
+    public function quit($token)
     {
         $recipient = $this->clients[$this->clientKey];
 
-        $this->sendResponse('quit', true, 'Desconectando cliente...');
+        $this->sendResponse('quit', true, $token, 'Desconectando cliente...');
 
         Socket::closeSocket($recipient['socket']);
 
