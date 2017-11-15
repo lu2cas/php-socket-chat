@@ -27,6 +27,12 @@ class Client
     private $clientSocket;
 
     /**
+     * Nome de usuário associado ao cliente
+     * @var string
+     */
+    private $username;
+
+    /**
      * Username do cliente selecionado para conversa privada
      * @var string
      */
@@ -121,7 +127,7 @@ class Client
                 if (empty($data['sender_username'])) {
                     printf("%s\n", $data['message']);
                 } else if ($data['sender_username'] == $this->activeRecipientUsername) {
-                    printf("[%s][%s]: %s\n", $data['datetime'], $data['sender_username'], $data['message']);
+                    printf("[%s][%s]: %s\n", $data['time'], $data['sender_username'], $data['message']);
                 }
             } else if ($data['type'] == 'response') {
                 $this->responsesBuffer[] = $data;
@@ -141,9 +147,11 @@ class Client
         if (!empty($input)) {
             if (!is_null($this->activeRecipientUsername)) {
                 if ($input == '/exit') {
+                    $message = sprintf("%s saiu do chat privado com você.\n", $this->username);
+                    $this->sendRequest('sendChatNotification', ['username' => $this->activeRecipientUsername, 'notification' => $message]);
                     $this->activeRecipientUsername = null;
                 } else {
-                    $this->sendRequest('sendChatMessage', ['recipient_username' => $this->activeRecipientUsername, 'message' => $input]);
+                    $this->sendRequest('sendChatMessage', ['username' => $this->activeRecipientUsername, 'message' => $input]);
                 }
             } else {
                 list($command, $parameters) = $this->parseInput($input);
@@ -264,6 +272,8 @@ class Client
             $this->sendRequest('bindUsername', ['username' => $username]);
         }
 
+        $this->username = $username;
+
         print("\n");
     }
 
@@ -279,7 +289,10 @@ class Client
 
         // Limpa a tela
         print(chr(27) . chr(91) . 'H' . chr(27) . chr(91) . 'J');
-        printf("Você está em um chat privado com %s.\n\n", $this->activeRecipientUsername);
+        printf("Você se conectou com %s em um chat privado.\n\n", $this->activeRecipientUsername);
+
+        $message = sprintf("%s se conectou à você em um chat privado!\n", $this->username);
+        $this->sendRequest('sendChatNotification', ['username' => $username, 'notification' => $message]);
     }
 
     /**

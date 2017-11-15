@@ -85,7 +85,8 @@ class Api
             'type' => 'message',
             'message' => $message,
             'sender_username' => is_null($sender_username) ? '' : $sender_username,
-            'datetime' => date('d/m/Y H:i:s')
+            'date' => date('d/m/Y'),
+            'time' => date('H:i:s'),
         ];
 
         $data = json_encode($data);
@@ -118,7 +119,8 @@ class Api
             'success' => $success ? 1 : 0,
             'message' => is_null($message) ? '' : $message,
             'data' => empty($data) ? '' : $data,
-            'datetime' => date('d/m/Y H:i:s'),
+            'date' => date('d/m/Y'),
+            'time' => date('H:i:s'),
             'token' => $token
         ];
 
@@ -186,7 +188,7 @@ class Api
     {
         $recipient = $this->clients[$this->clientKey];
 
-        $this->sendResponse('quit', true, $token, 'Desconectando cliente...');
+        $this->sendResponse('quit', true, $token, "\nDesconectando cliente...");
 
         Socket::closeSocket($recipient['socket']);
 
@@ -198,12 +200,31 @@ class Api
     /**
      * Envia uma mensagem para um cliente
      *
+     * @param string $username Username do cliente de destino
+     * @param string $notification Notificação a ser enviada
      * @throws Exception
      * @return void
      */
-    public function sendChatMessage($recipient_username, $message)
+    public function sendChatNotification($username, $notification)
     {
-        $recipient = $this->getClient($recipient_username);
+        $recipient = $this->getClient($username);
+
+        if (!is_null($recipient)) {
+            $this->sendMessage($recipient, sprintf('[!] %s', $notification));
+        }
+    }
+
+    /**
+     * Envia uma mensagem para um cliente
+     *
+     * @param string $username Username do cliente de destino
+     * @param string $message Mensagem a ser enviada
+     * @throws Exception
+     * @return void
+     */
+    public function sendChatMessage($username, $message)
+    {
+        $recipient = $this->getClient($username);
 
         if (!is_null($recipient)) {
             $this->sendMessage($recipient, $message, $this->clients[$this->clientKey]['username']);
