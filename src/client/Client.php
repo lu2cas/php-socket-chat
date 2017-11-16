@@ -419,6 +419,7 @@ class Client
             $group_inserted = $group_insertion->execute();
         } catch(\Exception $e) {
             print("Erro ao inserir grupo no banco de dados local.\n");
+            $commit = false;
         }
 
         $group_id = $this->db->lastInsertId();
@@ -434,14 +435,15 @@ class Client
             $contact = $contact->fetch();
 
             if (empty($contact)) {
-                printf("[!] %s não é um contato.\n", $username);
-                $commit = false;
-                continue;
+                $this->addContact($username);
+                $contact_id = $this->db->lastInsertId();
+            } else {
+                $contact_id = $contact['id'];
             }
 
             $groups_contacts_values = [
                 'group_id' => $group_id,
-                'contact_id' => $contact['id'],
+                'contact_id' => $contact_id,
                 'created' => sprintf('\'%s\'', date('Y-m-d H:i:s')),
                 'modified' => sprintf('\'%s\'', date('Y-m-d H:i:s'))
             ];
@@ -455,6 +457,7 @@ class Client
                 $groups_contacts_inserted = $groups_contacts_insertion->execute();
             } catch(\Exception $e) {
                 print("Erro ao inserir contato no grupo criado no banco de dados local.\n");
+                $commit = false;
             }
         }
 
