@@ -189,6 +189,12 @@ class Client
                     case '/listcontacts':
                         $this->listContacts(current($parameters));
                         break;
+                    case '/creategroup':
+                        $this->createGroup(array_shift($parameters), $parameters);
+                        break;
+                    case '/listgroups':
+                        $this->listGroups();
+                        break;
                     case '/privatechat':
                         $this->startPrivateChat(current($parameters));
                         break;
@@ -348,7 +354,7 @@ class Client
         $values = [
             'username' => sprintf('\'%s\'', trim($username)),
             'created' => sprintf('\'%s\'', date('Y-m-d H:i:s')),
-            'modified' =>  sprintf('\'%s\'', date('Y-m-d H:i:s'))
+            'modified' => sprintf('\'%s\'', date('Y-m-d H:i:s'))
         ];
 
         $contact_insertion = $this->db->createQueryBuilder();
@@ -358,8 +364,8 @@ class Client
 
         try {
             $contact_inserted = $contact_insertion->execute();
-        } catch(Exception $e) {
-            throw new Exception('Erro ao inserir contato no banco de dados local.');
+        } catch(\Exception $e) {
+            print("Erro ao inserir contato no banco de dados local.\n");
         }
     }
 
@@ -388,13 +394,75 @@ class Client
     /**
      * Lista todos os contatos adicionados no banco de dados local
      *
-     * @param string $group_name Nome do grupo a ser criado
+     * @param string $name Nome do grupo a ser criado
      * @param array $usernames Usernames dos contatos a serem adicionados no grupo
      * @return void
      */
-    private function createGroup($group_name, $usernames)
+    private function createGroup($name, $usernames)
     {
+        $commit = true;
 
+        $this->db->beginTransaction();
+
+        $group_values = [
+            'name' => sprintf('\'%s\'', trim($name)),
+            'created' => sprintf('\'%s\'', date('Y-m-d H:i:s')),
+            'modified' => sprintf('\'%s\'', date('Y-m-d H:i:s'))
+        ];
+
+        $group_insertion = $this->db->createQueryBuilder();
+        $group_insertion
+            ->insert('groups')
+            ->values($group_values);
+
+        try {
+            $group_inserted = $group_insertion->execute();
+        } catch(\Exception $e) {
+            print("Erro ao inserir grupo no banco de dados local.\n");
+        }
+
+        $group_id = $this->db->lastInsertId();
+
+        foreach ($usernames as $username) {
+            $contacts_query = $this->db->createQueryBuilder();
+            $contacts_query
+                ->select('id')
+                ->from('contacts')
+                ->where(sprintf('username = \'%s\'', trim($username)));
+
+            $contact = $contacts_query->execute();
+            $contact = $contact->fetch();
+
+            if (empty($contact)) {
+                printf("[!] %s não é um contato.\n", $username);
+                $commit = false;
+                continue;
+            }
+
+            $groups_contacts_values = [
+                'group_id' => $group_id,
+                'contact_id' => $contact['id'],
+                'created' => sprintf('\'%s\'', date('Y-m-d H:i:s')),
+                'modified' => sprintf('\'%s\'', date('Y-m-d H:i:s'))
+            ];
+
+            $groups_contacts_insertion = $this->db->createQueryBuilder();
+            $groups_contacts_insertion
+                ->insert('groups_contacts')
+                ->values($groups_contacts_values);
+
+            try {
+                $groups_contacts_inserted = $groups_contacts_insertion->execute();
+            } catch(\Exception $e) {
+                print("Erro ao inserir contato no grupo criado no banco de dados local.\n");
+            }
+        }
+
+        if ($commit) {
+            $this->db->commit();
+        } else {
+            $this->db->rollBack();
+        }
     }
 
     /**
@@ -404,6 +472,32 @@ class Client
      */
     private function listGroups()
     {
+        $groups_query = $this->db->createQueryBuilder();
+        $groups_query
+            ->select('*')
+            ->from('groups');
 
+        $groups = $groups_query->execute();
+        $groups = $groups->fetchAll();
+
+        foreach ($groups as $group) {
+            printf("%s\n", $group['name']);
+
+            $groups_contacts_query = $this->db->createQueryBuilder();
+            $groups_contacts_query
+                ->select('c.username')
+                ->from('groups_contacts', 'gc')
+                ->innerJoin('gc', 'contacts', 'c', 'c.id = gc.contact_id')
+                ->where(sprintf('gc.group_id = %d', $group['id']));
+
+            $groups_contacts = $groups_contacts_query->execute();
+            $groups_contacts = $groups_contacts->fetchAll();
+
+            foreach ($groups_contacts as $group_contact) {
+                printf("\t%s\n", $group_contact['username']);
+            }
+        }
+
+        print("\n");
     }
 }
