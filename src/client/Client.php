@@ -144,6 +144,14 @@ class Client
                 }
             } else if ($data['type'] == 'response') {
                 $this->responsesBuffer[] = $data;
+            } else if ($data['type'] == 'instruction') {
+                call_user_func_array(
+                    [
+                        $this,
+                        $data['method']
+                    ],
+                    $data['parameters']
+                );
             }
         }
     }
@@ -175,6 +183,12 @@ class Client
                     case '/quit':
                         $this->quit();
                         break;
+                    case '/addcontact':
+                        $this->addContact(current($parameters));
+                        break;
+                    case '/listcontacts':
+                        $this->listContacts(current($parameters));
+                        break;
                     case '/privatechat':
                         $this->startPrivateChat(current($parameters));
                         break;
@@ -200,7 +214,6 @@ class Client
 
         if (substr($input, 0, 1) == '/') {
             $space = strpos($input, ' ');
-
             if ($space !== false) {
                 $command = substr($input, 0, $space);
                 $parameters = trim(substr($input, $space));
@@ -208,7 +221,7 @@ class Client
                 if (in_array($command, ['/echo', '/privatechat'])) {
                     $parameters = [$parameters];
                 } else {
-                    $parameters = explode($parameters, ' ');
+                    $parameters = explode(' ', $parameters);
                 }
 
                 $parsed_input['command'] = $command;
@@ -325,11 +338,71 @@ class Client
     }
 
     /**
-     * Encerra as atividades do cliente
+     * Adiciona um contato no banco de dados local
      *
+     * @param string $username Username do contato a ser adicionado
      * @return void
      */
     private function addContact($username)
+    {
+        $values = [
+            'username' => sprintf('\'%s\'', trim($username)),
+            'created' => sprintf('\'%s\'', date('Y-m-d H:i:s')),
+            'modified' =>  sprintf('\'%s\'', date('Y-m-d H:i:s'))
+        ];
+
+        $contact_insertion = $this->db->createQueryBuilder();
+        $contact_insertion
+            ->insert('contacts')
+            ->values($values);
+
+        try {
+            $contact_inserted = $contact_insertion->execute();
+        } catch(Exception $e) {
+            throw new Exception('Erro ao inserir contato no banco de dados local.');
+        }
+    }
+
+    /**
+     * Lista todos os contatos adicionados no banco de dados local
+     *
+     * @return void
+     */
+    private function listContacts()
+    {
+        $contacts_query = $this->db->createQueryBuilder();
+        $contacts_query
+            ->select('*')
+            ->from('contacts');
+
+        $contacts = $contacts_query->execute();
+        $contacts = $contacts->fetchAll();
+
+        foreach ($contacts as $contact) {
+            printf("%s\n", $contact['username']);
+        }
+
+        print("\n");
+    }
+
+    /**
+     * Lista todos os contatos adicionados no banco de dados local
+     *
+     * @param string $group_name Nome do grupo a ser criado
+     * @param array $usernames Usernames dos contatos a serem adicionados no grupo
+     * @return void
+     */
+    private function createGroup($group_name, $usernames)
+    {
+
+    }
+
+    /**
+     * Lista todos os grupos criados no banco de dados local
+     *
+     * @return void
+     */
+    private function listGroups()
     {
 
     }
