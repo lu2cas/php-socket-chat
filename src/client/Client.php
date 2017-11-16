@@ -21,6 +21,12 @@ class Client
     private $config;
 
     /**
+     * Handler do banco de dados local
+     * @var resource
+     */
+    private $db;
+
+    /**
      * Socket responsável por realizar as funções de cliente
      * @var resource
      */
@@ -79,6 +85,13 @@ class Client
         $this->clientSocket = null;
         $this->activeRecipientUsername = null;
         $this->activeGroup = null;
+
+        $config = new \Doctrine\DBAL\Configuration();
+        $connection_params = [
+            'path' => __DIR__ . DIRECTORY_SEPARATOR . 'local.db',
+            'driver' => 'pdo_sqlite'
+        ];
+        $this->db = \Doctrine\DBAL\DriverManager::getConnection($connection_params, $config);
 
         error_reporting(E_ALL);
         set_time_limit(0);
@@ -300,7 +313,8 @@ class Client
      *
      * @return void
      */
-    private function quit() {
+    private function quit()
+    {
         $token = sha1('quit' . microtime());
 
         $this->sendRequest('quit', ['token' => $token]);
@@ -308,5 +322,15 @@ class Client
 
         printf("%s\n", $response['message']);
         exit(0);
+    }
+
+    /**
+     * Encerra as atividades do cliente
+     *
+     * @return void
+     */
+    private function addContact($username)
+    {
+
     }
 }
